@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, Menu, X } from 'lucide-react'
+import { Calendar, Menu, X, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
@@ -30,6 +30,10 @@ export function Navbar() {
             <a href="#blog" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">
               Blog
             </a>
+            <Link to="/co-parents" className="flex items-center gap-1.5 text-slate-600 hover:text-teal-600 text-sm font-medium transition-colors">
+              <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+              For Co-Parents
+            </Link>
             <a href="#pta" className="flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">
               For PTAs
               <Badge variant="new" className="text-xs">New</Badge>
@@ -63,6 +67,10 @@ export function Navbar() {
           <a href="#features" className="block text-slate-600 hover:text-slate-900 text-sm font-medium py-2.5" onClick={() => setIsOpen(false)}>Features</a>
           <a href="#pricing" className="block text-slate-600 hover:text-slate-900 text-sm font-medium py-2.5" onClick={() => setIsOpen(false)}>Pricing</a>
           <a href="#blog" className="block text-slate-600 hover:text-slate-900 text-sm font-medium py-2.5" onClick={() => setIsOpen(false)}>Blog</a>
+          <Link to="/co-parents" className="flex items-center gap-1.5 text-slate-600 hover:text-teal-600 text-sm font-medium py-2.5" onClick={() => setIsOpen(false)}>
+            <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+            For Co-Parents
+          </Link>
           <a href="#pta" className="flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-medium py-2.5" onClick={() => setIsOpen(false)}>
             For PTAs <Badge variant="new" className="text-xs">New</Badge>
           </a>

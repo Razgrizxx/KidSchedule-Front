@@ -13,6 +13,7 @@ import { MomentsPage } from './pages/dashboard/MomentsPage'
 import { MediationPage } from './pages/dashboard/MediationPage'
 import { SettingsPage } from './pages/dashboard/SettingsPage'
 import { FamilyPage } from './pages/dashboard/FamilyPage'
+import { CoParentsPage } from './pages/CoParentsPage'
 import { Toaster } from './components/ui/toaster'
 import { useAuthStore } from './store/authStore'
 
@@ -49,6 +50,7 @@ function App() {
             <Route path="family" element={<FamilyPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
+          <Route path="/co-parents" element={<CoParentsPage />} />
         </Routes>
         <Toaster />
       </div>

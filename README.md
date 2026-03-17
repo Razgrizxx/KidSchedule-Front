@@ -1,73 +1,160 @@
-# React + TypeScript + Vite
+# KidSchedule — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite frontend for the KidSchedule co-parenting platform.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Prerequisites
 
-## React Compiler
+| Tool | Version |
+|------|---------|
+| Node.js | 18 or later |
+| npm | 9 or later |
+| KidSchedule API | Running on port 3000 |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+> The frontend expects the backend to be running locally before you start. See the [backend README](../kidSchedule/README.md) for setup instructions.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Local Setup
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 1. Install dependencies
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd KidScheduleFront
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. Verify the API base URL
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+The app points to `http://localhost:3000/api/v1` by default (hardcoded in `src/api.ts`).
+If your backend runs on a different port, update that file.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 3. Start the development server
+
+```bash
+npm run dev
 ```
+
+The app will be available at **`http://localhost:5173`**
+
+---
+
+## Full Stack Quickstart
+
+Open two terminals:
+
+**Terminal 1 — Backend**
+```bash
+cd kidSchedule
+npm run start:dev
+```
+
+**Terminal 2 — Frontend**
+```bash
+cd KidScheduleFront
+npm run dev
+```
+
+Then open **`http://localhost:5173`** in your browser.
+
+**Test login (from the seed):**
+
+| Field | Value |
+|-------|-------|
+| Email | `christian@kidschedule.app` |
+| Password | `Admin@2026!` |
+
+---
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server with HMR |
+| `npm run build` | Type-check and build for production |
+| `npm run preview` | Preview the production build locally |
+| `npm run lint` | Run ESLint |
+
+---
+
+## Public Routes
+
+| Path | Page |
+|------|------|
+| `/` | Landing page |
+| `/families` | Busy Families landing |
+| `/co-parents` | Co-Parents landing |
+| `/teams` | Teams & Clubs landing |
+| `/pta` | PTAs & Schools landing |
+| `/blog` | Blog list |
+| `/blog/:slug` | Blog post detail |
+| `/login` | Login / Register |
+| `/forgot-password` | Password reset request |
+| `/reset-password` | Password reset (via email link) |
+
+## Dashboard Routes (require login)
+
+| Path | Page |
+|------|------|
+| `/dashboard` | Home / overview |
+| `/dashboard/calendar` | Custody calendar |
+| `/dashboard/family` | Children, members, caregivers |
+| `/dashboard/messages` | Family messaging |
+| `/dashboard/expenses` | Shared expenses |
+| `/dashboard/requests` | Custody change requests |
+| `/dashboard/moments` | Photo gallery |
+| `/dashboard/mediation` | Mediation tools |
+| `/dashboard/settings` | Family and user settings |
+
+---
+
+## Project Structure
+
+```
+src/
+├── api.ts                  # Axios instance (base URL + auth interceptor)
+├── App.tsx                 # Route definitions
+├── components/
+│   ├── dashboard/          # Layout, Sidebar, TopBar, modals
+│   └── ui/                 # shadcn/ui primitives
+├── hooks/                  # TanStack Query hooks per domain
+│   ├── useDashboard.ts
+│   ├── useCalendar.ts
+│   ├── useMessages.ts
+│   ├── useExpenses.ts
+│   ├── useRequests.ts
+│   ├── useMoments.ts
+│   ├── useSettings.ts
+│   └── useBlog.ts
+├── pages/
+│   ├── dashboard/          # All authenticated app pages
+│   ├── BlogListPage.tsx
+│   ├── BlogDetailPage.tsx
+│   ├── CoParentsPage.tsx
+│   ├── FamiliesPage.tsx
+│   ├── PTAPage.tsx
+│   └── TeamsPage.tsx
+├── store/
+│   └── authStore.ts        # Zustand store (token, user, theme)
+└── types/
+    └── api.ts              # Shared TypeScript interfaces
+```
+
+---
+
+## Tech Stack
+
+| Library | Purpose |
+|---------|---------|
+| React 19 + TypeScript | UI framework |
+| Vite | Dev server and bundler |
+| React Router v7 | Client-side routing |
+| TanStack Query | Server state, caching, mutations |
+| Zustand | Client state (auth, appearance) |
+| Tailwind CSS v4 | Styling |
+| shadcn/ui | UI component primitives |
+| Framer Motion | Animations |
+| Axios | HTTP client |
+| react-markdown | Markdown rendering (blog) |
+| react-hook-form + Zod | Form validation |

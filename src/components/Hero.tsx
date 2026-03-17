@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { CheckCircle, ArrowRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 
 const checkItems = [
@@ -33,9 +34,11 @@ export function Hero() {
           transition={{ duration: 0.6, delay: 0.15 }}
           className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12"
         >
-          <Button size="lg" className="shadow-md shadow-teal-200/60 px-8">
-            Start Free for 60 Days
-          </Button>
+          <Link to="/login">
+            <Button size="lg" className="shadow-md shadow-teal-200/60 px-8">
+              Start Free for 60 Days
+            </Button>
+          </Link>
           <Button variant="ghost" className="flex items-center gap-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50">
             See How It Works <ArrowRight className="w-4 h-4" />
           </Button>

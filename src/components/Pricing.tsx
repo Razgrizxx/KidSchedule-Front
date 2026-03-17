@@ -177,7 +177,7 @@ export function Pricing() {
                     }`}
                     onClick={() => {
                       const type = planType === 'fullFamily' ? 'family' : 'parent'
-                      window.location.href = `/register?plan=${plan.id}&type=${type}`
+                      window.location.href = `/login?plan=${plan.id}&type=${type}`
                     }}
                   >
                     Start Free Trial

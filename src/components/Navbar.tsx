@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Calendar, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -37,8 +38,12 @@ export function Navbar() {
 
           {/* Desktop CTAs */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" size="sm">Log In</Button>
-            <Button size="sm">Get Started</Button>
+            <Link to="/login">
+              <Button variant="ghost" size="sm">Log In</Button>
+            </Link>
+            <Link to="/login">
+              <Button size="sm">Get Started</Button>
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -62,8 +67,12 @@ export function Navbar() {
             For PTAs <Badge variant="new" className="text-xs">New</Badge>
           </a>
           <div className="flex flex-col gap-2 pt-3 border-t border-slate-100">
-            <Button variant="outline" size="sm" className="w-full">Log In</Button>
-            <Button size="sm" className="w-full">Get Started</Button>
+            <Link to="/login" onClick={() => setIsOpen(false)}>
+              <Button variant="outline" size="sm" className="w-full">Log In</Button>
+            </Link>
+            <Link to="/login" onClick={() => setIsOpen(false)}>
+              <Button size="sm" className="w-full">Get Started</Button>
+            </Link>
           </div>
         </div>
       )}

@@ -64,3 +64,26 @@ export function useInviteMember(familyId: string) {
     },
   })
 }
+
+export interface CreateCaregiverDto {
+  name: string
+  email?: string
+  relationship?: string
+  visibility: 'SHARED' | 'PRIVATE'
+  linkExpiry: 'SEVEN_DAYS' | 'THIRTY_DAYS' | 'NINETY_DAYS' | 'ONE_YEAR' | 'NEVER'
+  canViewCalendar: boolean
+  canViewHealthInfo: boolean
+  canViewEmergencyContacts: boolean
+  canViewAllergies: boolean
+}
+
+export function useAddCaregiver(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (dto: CreateCaregiverDto) =>
+      api.post(`/families/${familyId}/caregivers`, dto).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['caregivers', familyId] })
+    },
+  })
+}

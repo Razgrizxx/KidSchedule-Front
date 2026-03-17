@@ -142,6 +142,10 @@ export interface Caregiver {
   canViewCalendar: boolean
   canViewHealthInfo: boolean
   canViewEmergencyContacts: boolean
+  canViewAllergies: boolean
+  inviteToken?: string
+  linkExpiry: 'SEVEN_DAYS' | 'THIRTY_DAYS' | 'NINETY_DAYS' | 'ONE_YEAR' | 'NEVER'
+  linkExpiresAt?: string
   createdAt: string
   updatedAt: string
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Baby, Users, UserPlus, Plus, Shield, Mail, Loader2 } from 'lucide-react'
+import { Baby, Users, UserPlus, Plus, Shield, Mail, Loader2, Share2, Lock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +24,7 @@ import {
   useInviteMember,
   type CreateChildDto,
 } from '@/hooks/useDashboard'
+import { InviteCaregiverModal } from '@/components/dashboard/InviteCaregiverModal'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/hooks/use-toast'
 import type { Child, FamilyMember, Caregiver } from '@/types/api'
@@ -121,15 +122,17 @@ function CaregiverRow({ caregiver }: { caregiver: Caregiver }) {
           {caregiver.email && ` · ${caregiver.email}`}
         </p>
       </div>
-      <span
-        className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
-          caregiver.visibility === 'SHARED'
-            ? 'bg-teal-50 text-teal-600'
-            : 'bg-slate-50 text-slate-500'
-        }`}
-      >
-        {caregiver.visibility === 'SHARED' ? 'Shared' : 'Private'}
-      </span>
+      {caregiver.visibility === 'SHARED' ? (
+        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-600 shrink-0">
+          <Share2 className="w-3 h-3" />
+          Shared
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">
+          <Lock className="w-3 h-3" />
+          Private
+        </span>
+      )}
     </div>
   )
 }
@@ -187,6 +190,10 @@ export function FamilyPage() {
       toast({ title: 'Could not add child', variant: 'error' })
     }
   }
+
+  // ── Caregiver modal ───────────────────────────────────────────────────────
+  const [caregiverModalOpen, setCaregiverModalOpen] = useState(false)
+  const [caregiverIsShared, setCaregiverIsShared] = useState(true)
 
   // ── Invite Member dialog ──────────────────────────────────────────────────
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -337,9 +344,26 @@ export function FamilyPage() {
                 </p>
               </div>
             </div>
-            <span className="text-xs text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
-              {loadingCaregivers ? '…' : caregivers?.length ?? 0} caregiver{(caregivers?.length ?? 0) !== 1 ? 's' : ''}
-            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setCaregiverIsShared(true); setCaregiverModalOpen(true) }}
+                className="gap-1.5 border-purple-200 text-purple-600 hover:bg-purple-50"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                Shared
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setCaregiverIsShared(false); setCaregiverModalOpen(true) }}
+                className="gap-1.5 border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                Private
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-2">
@@ -430,6 +454,14 @@ export function FamilyPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Invite Caregiver Modal ────────────────────────────────────────── */}
+      <InviteCaregiverModal
+        open={caregiverModalOpen}
+        onOpenChange={setCaregiverModalOpen}
+        familyId={familyId}
+        isShared={caregiverIsShared}
+      />
 
       {/* ── Invite Member Dialog ───────────────────────────────────────────── */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>

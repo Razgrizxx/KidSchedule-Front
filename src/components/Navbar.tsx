@@ -71,9 +71,9 @@ export function Navbar() {
             <SmartNavLink id="pricing" className={linkClass}>
               Pricing
             </SmartNavLink>
-            <a href="#blog" className={linkClass}>
+            <Link to="/blog" className={linkClass}>
               Blog
-            </a>
+            </Link>
             <Link
               to="/families"
               className="text-slate-600 hover:text-emerald-600 text-sm font-medium transition-colors"
@@ -151,13 +151,13 @@ export function Navbar() {
           >
             Pricing
           </SmartNavLink>
-          <a
-            href="#blog"
+          <Link
+            to="/blog"
             className={mobileLinkClass}
             onClick={() => setIsOpen(false)}
           >
             Blog
-          </a>
+          </Link>
           <Link
             to="/co-parents"
             className="flex items-center gap-1.5 text-slate-600 hover:text-teal-600 text-sm font-medium py-2.5"

@@ -17,6 +17,8 @@ import { CoParentsPage } from './pages/CoParentsPage'
 import { PTAPage } from './pages/PTAPage'
 import { TeamsPage } from './pages/TeamsPage'
 import { FamiliesPage } from './pages/FamiliesPage'
+import { BlogListPage } from './pages/BlogListPage'
+import { BlogDetailPage } from './pages/BlogDetailPage'
 import { Toaster } from './components/ui/toaster'
 import { useAuthStore } from './store/authStore'
 
@@ -57,6 +59,8 @@ function App() {
           <Route path="/pta" element={<PTAPage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/families" element={<FamiliesPage />} />
+          <Route path="/blog" element={<BlogListPage />} />
+          <Route path="/blog/:slug" element={<BlogDetailPage />} />
         </Routes>
         <Toaster />
       </div>

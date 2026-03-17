@@ -18,6 +18,8 @@ const audiences: AudienceCard[] = [
     title: 'Busy Families',
     description:
       'Juggling school, sports, music, and more? KidSchedule keeps every activity, pickup, and permission slip in one place — for every kid.',
+    href: '/families',
+    cta: 'See family features',
   },
   {
     icon: GitBranch,
@@ -31,13 +33,17 @@ const audiences: AudienceCard[] = [
     icon: Trophy,
     title: 'Teams & Clubs',
     description:
-      'Coaches and club managers can publish practice schedules, game days, and events directly to member family calendars.',
+      'One calendar for the whole team. Share schedules, track RSVPs, send change notifications, and keep every parent in the loop.',
+    href: '/teams',
+    cta: 'See team features',
   },
   {
     icon: GraduationCap,
     title: 'PTAs & Schools',
     description:
-      'Share school events, early dismissal days, and fundraisers with every family — no more paper newsletters lost in the backpack.',
+      'Member management, committees, announcements, and events — everything your PTA needs, in one place built for busy volunteers.',
+    href: '/pta',
+    cta: 'See PTA features',
   },
 ]
 

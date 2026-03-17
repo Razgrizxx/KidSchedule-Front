@@ -14,6 +14,9 @@ import { MediationPage } from './pages/dashboard/MediationPage'
 import { SettingsPage } from './pages/dashboard/SettingsPage'
 import { FamilyPage } from './pages/dashboard/FamilyPage'
 import { CoParentsPage } from './pages/CoParentsPage'
+import { PTAPage } from './pages/PTAPage'
+import { TeamsPage } from './pages/TeamsPage'
+import { FamiliesPage } from './pages/FamiliesPage'
 import { Toaster } from './components/ui/toaster'
 import { useAuthStore } from './store/authStore'
 
@@ -51,6 +54,9 @@ function App() {
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="/co-parents" element={<CoParentsPage />} />
+          <Route path="/pta" element={<PTAPage />} />
+          <Route path="/teams" element={<TeamsPage />} />
+          <Route path="/families" element={<FamiliesPage />} />
         </Routes>
         <Toaster />
       </div>

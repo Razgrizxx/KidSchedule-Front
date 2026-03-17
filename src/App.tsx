@@ -1,9 +1,24 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { DashboardLayout } from './components/dashboard/DashboardLayout'
+import { DashboardHome } from './pages/dashboard/DashboardHome'
+import { CalendarPage } from './pages/dashboard/CalendarPage'
+import { MessagesPage } from './pages/dashboard/MessagesPage'
+import { ExpensesPage } from './pages/dashboard/ExpensesPage'
+import { RequestsPage } from './pages/dashboard/RequestsPage'
+import { MomentsPage } from './pages/dashboard/MomentsPage'
+import { MediationPage } from './pages/dashboard/MediationPage'
 import { Toaster } from './components/ui/toaster'
+import { useAuthStore } from './store/authStore'
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const token = useAuthStore((s) => s.token)
+  if (!token) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
 
 function App() {
   return (
@@ -14,6 +29,22 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route
+            path="/dashboard"
+            element={
+              <RequireAuth>
+                <DashboardLayout />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<DashboardHome />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="messages" element={<MessagesPage />} />
+            <Route path="expenses" element={<ExpensesPage />} />
+            <Route path="requests" element={<RequestsPage />} />
+            <Route path="moments" element={<MomentsPage />} />
+            <Route path="mediation" element={<MediationPage />} />
+          </Route>
         </Routes>
         <Toaster />
       </div>

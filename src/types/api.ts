@@ -130,6 +130,22 @@ export interface Moment {
   uploader?: AuthUser
 }
 
+export interface Caregiver {
+  id: string
+  familyId?: string
+  createdBy: string
+  name: string
+  phone?: string
+  email?: string
+  relationship?: string
+  visibility: 'SHARED' | 'PRIVATE'
+  canViewCalendar: boolean
+  canViewHealthInfo: boolean
+  canViewEmergencyContacts: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export type AppearanceTheme = 'FRIENDLY' | 'MODERN' | 'MINIMAL'
 export type TimeFormat = 'TWELVE_HOUR' | 'TWENTY_FOUR_HOUR'
 

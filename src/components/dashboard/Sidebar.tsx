@@ -7,6 +7,7 @@ import {
   Images,
   Scale,
   ClipboardList,
+  Users,
   Settings,
   LogOut,
   Calendar,
@@ -19,12 +20,13 @@ import { Separator } from '@/components/ui/separator'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
+  { label: 'Family', icon: Users, to: '/dashboard/family' },
   { label: 'Calendar', icon: CalendarDays, to: '/dashboard/calendar' },
   { label: 'Expenses', icon: DollarSign, to: '/dashboard/expenses' },
   { label: 'Messages', icon: MessageSquare, to: '/dashboard/messages' },
   { label: 'Moments', icon: Images, to: '/dashboard/moments' },
-  { label: 'Mediation', icon: Scale, to: '/dashboard/mediation' },
   { label: 'Requests', icon: ClipboardList, to: '/dashboard/requests' },
+  { label: 'Mediation', icon: Scale, to: '/dashboard/mediation' },
 ]
 
 interface SidebarProps {

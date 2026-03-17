@@ -1,22 +1,23 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
+import { useAuthStore } from '@/store/authStore'
 
 export function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const appearance = useAuthStore((s) => s.appearance)
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar
-        mobileOpen={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-      />
+    <div
+      data-theme={appearance}
+      className="min-h-screen flex"
+      style={{ backgroundColor: 'var(--page-bg, #f8fafc)' }}
+    >
+      <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col lg:pl-60 min-w-0">
         <TopBar onMenuClick={() => setMobileOpen(true)} />
 

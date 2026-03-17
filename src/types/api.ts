@@ -129,3 +129,28 @@ export interface Moment {
   createdAt: string
   uploader?: AuthUser
 }
+
+export type AppearanceTheme = 'FRIENDLY' | 'MODERN' | 'MINIMAL'
+export type TimeFormat = 'TWELVE_HOUR' | 'TWENTY_FOUR_HOUR'
+
+export interface FamilySettings {
+  id: string
+  familyId: string
+  timezone: string
+  transitionDay: string
+  transitionTime: string
+  weekStartsOn: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface UserSettings {
+  id: string
+  userId: string
+  timeFormat: TimeFormat
+  emailNotifications: boolean
+  pushNotifications: boolean
+  appearance: AppearanceTheme
+  createdAt: string
+  updatedAt: string
+}

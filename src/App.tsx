@@ -11,6 +11,7 @@ import { ExpensesPage } from './pages/dashboard/ExpensesPage'
 import { RequestsPage } from './pages/dashboard/RequestsPage'
 import { MomentsPage } from './pages/dashboard/MomentsPage'
 import { MediationPage } from './pages/dashboard/MediationPage'
+import { SettingsPage } from './pages/dashboard/SettingsPage'
 import { Toaster } from './components/ui/toaster'
 import { useAuthStore } from './store/authStore'
 
@@ -44,6 +45,7 @@ function App() {
             <Route path="requests" element={<RequestsPage />} />
             <Route path="moments" element={<MomentsPage />} />
             <Route path="mediation" element={<MediationPage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>
         <Toaster />

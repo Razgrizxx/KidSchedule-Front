@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import {
   Plus, Loader2, DollarSign, TrendingUp, TrendingDown,
-  Receipt, Trash2, X, FileText, ExternalLink,
+  Receipt, Trash2, X, FileText, CheckCircle2, Circle,
 } from 'lucide-react'
 import { type Resolver, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,7 +16,12 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useFamilies, useChildren } from '@/hooks/useDashboard'
-import { useExpenses, useExpenseBalance, useCreateExpense, useDeleteExpense, useUploadReceipt } from '@/hooks/useExpenses'
+import {
+  useExpenses, useExpenseBalance,
+  useCreateExpense, useDeleteExpense,
+  useSettleExpense, useSettleAllExpenses,
+  useUploadReceipt,
+} from '@/hooks/useExpenses'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/hooks/use-toast'
 import type { ExpenseCategory } from '@/types/api'
@@ -52,8 +57,6 @@ const expenseSchema = z.object({
 })
 type ExpenseForm = z.infer<typeof expenseSchema>
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function fmtLabel(s: string) {
   return s.charAt(0) + s.slice(1).toLowerCase()
 }
@@ -66,19 +69,23 @@ export function ExpensesPage() {
   const familyId = families?.[0]?.id
 
   const { data: expenses, isLoading } = useExpenses(familyId)
-  useExpenseBalance(familyId) // pre-fetch for future settle-up feature
+  const { data: balanceData } = useExpenseBalance(familyId)
   const { data: children } = useChildren(familyId)
-  const createExpense = useCreateExpense(familyId ?? '')
-  const deleteExpense = useDeleteExpense(familyId ?? '')
-  const uploadReceipt = useUploadReceipt(familyId ?? '')
 
-  const [filterCategory, setFilterCategory] = useState<string>('ALL')
-  const [addOpen, setAddOpen] = useState(false)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const createExpense  = useCreateExpense(familyId ?? '')
+  const deleteExpense  = useDeleteExpense(familyId ?? '')
+  const settleExpense  = useSettleExpense(familyId ?? '')
+  const settleAll      = useSettleAllExpenses(familyId ?? '')
+  const uploadReceipt  = useUploadReceipt(familyId ?? '')
 
-  // Receipt file state (managed outside RHF because it's a File object)
+  const [filterCategory, setFilterCategory]     = useState<string>('ALL')
+  const [filterSettled, setFilterSettled]       = useState<'all' | 'pending' | 'settled'>('all')
+  const [addOpen, setAddOpen]                   = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId]   = useState<string | null>(null)
+  const [confirmSettleId, setConfirmSettleId]   = useState<string | null>(null)
+
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
-  const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
+  const [receiptUrl, setReceiptUrl]   = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
@@ -95,19 +102,31 @@ export function ExpensesPage() {
 
   const watchSplit = watch('splitRatio', 0.5)
 
-  // ── My net balance (local calculation from expense list) ─────────────────
+  // ── Derived balances ──────────────────────────────────────────────────────
 
-  const myBalance = expenses?.reduce((sum, e) => {
+  // Pending net balance for the current user (from local expense list for speed)
+  const myPendingBalance = expenses?.reduce((sum, e) => {
+    if (e.isSettled) return sum
     const amount = parseFloat(e.amount)
     const split  = parseFloat(e.splitRatio)
     return e.paidBy === user?.id
-      ? sum + amount * split          // other owes me splitRatio of amount
-      : sum - amount * (1 - split)   // I owe other (1-splitRatio) of amount
+      ? sum + amount * split
+      : sum - amount * (1 - split)
   }, 0) ?? 0
 
-  const filtered = filterCategory === 'ALL'
-    ? expenses
-    : expenses?.filter((e) => e.category === filterCategory)
+  const pendingCount  = balanceData?.summary?.pendingCount  ?? 0
+  const settledCount  = balanceData?.summary?.settledCount  ?? 0
+  const totalSettled  = balanceData?.summary?.totalSettled  ?? 0
+  const hasPending    = pendingCount > 0
+
+  // ── Filtering ─────────────────────────────────────────────────────────────
+
+  const filtered = (expenses ?? []).filter((e) => {
+    if (filterCategory !== 'ALL' && e.category !== filterCategory) return false
+    if (filterSettled === 'pending' && e.isSettled) return false
+    if (filterSettled === 'settled' && !e.isSettled) return false
+    return true
+  })
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -154,6 +173,27 @@ export function ExpensesPage() {
     }
   }
 
+  async function handleSettle(expenseId: string, unsettle = false) {
+    try {
+      await settleExpense.mutateAsync({ expenseId, unsettle })
+      toast({
+        title: unsettle ? 'Marked as pending' : 'Expense settled!',
+        variant: 'success',
+      })
+    } catch {
+      toast({ title: 'Failed to update expense', variant: 'error' })
+    }
+  }
+
+  async function handleSettleAll() {
+    try {
+      const result = await settleAll.mutateAsync()
+      toast({ title: `${result.settled} expense${result.settled !== 1 ? 's' : ''} settled`, variant: 'success' })
+    } catch {
+      toast({ title: 'Failed to settle expenses', variant: 'error' })
+    }
+  }
+
   async function handleDelete(expenseId: string) {
     try {
       await deleteExpense.mutateAsync(expenseId)
@@ -168,6 +208,7 @@ export function ExpensesPage() {
 
   return (
     <div className="space-y-4 max-w-5xl">
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -181,36 +222,61 @@ export function ExpensesPage() {
       </div>
 
       {/* Balance card */}
-      <Card className={`border-2 ${myBalance >= 0 ? 'border-teal-100' : 'border-orange-100'}`}>
-        <CardContent className="pt-6">
+      <Card className={`border-2 ${myPendingBalance >= 0 ? 'border-teal-100' : 'border-orange-100'}`}>
+        <CardContent className="pt-5 pb-5">
           <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${myBalance >= 0 ? 'bg-teal-50' : 'bg-orange-50'}`}>
-              {myBalance >= 0
+            {/* Net balance */}
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${myPendingBalance >= 0 ? 'bg-teal-50' : 'bg-orange-50'}`}>
+              {myPendingBalance >= 0
                 ? <TrendingUp className="w-6 h-6 text-teal-500" />
                 : <TrendingDown className="w-6 h-6 text-orange-400" />}
             </div>
-            <div>
-              <p className="text-sm text-slate-400 mb-1">
-                {myBalance >= 0 ? 'You are owed' : 'You owe'}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-slate-400 mb-0.5">
+                {myPendingBalance >= 0 ? 'You are owed (pending)' : 'You owe (pending)'}
               </p>
-              <p className={`text-3xl font-bold ${myBalance >= 0 ? 'text-teal-600' : 'text-orange-500'}`}>
-                ${Math.abs(myBalance).toFixed(2)}
+              <p className={`text-2xl font-bold ${myPendingBalance >= 0 ? 'text-teal-600' : 'text-orange-500'}`}>
+                ${Math.abs(myPendingBalance).toFixed(2)}
               </p>
             </div>
-            {Math.abs(myBalance) > 0.01 && (
-              <div className="ml-auto">
-                <Button variant="outline" className="gap-2">
-                  <DollarSign className="w-4 h-4" />
-                  Settle Up
-                </Button>
+
+            {/* Settled summary */}
+            <div className="text-right shrink-0 space-y-0.5">
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="text-xs text-slate-500">
+                  <strong>{pendingCount}</strong> pending
+                </span>
               </div>
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-teal-400" />
+                <span className="text-xs text-slate-500">
+                  <strong>{settledCount}</strong> settled · ${totalSettled.toFixed(2)} total
+                </span>
+              </div>
+            </div>
+
+            {/* Settle all button */}
+            {hasPending && (
+              <Button
+                variant="outline"
+                className="gap-2 shrink-0"
+                disabled={settleAll.isPending}
+                onClick={() => void handleSettleAll()}
+              >
+                {settleAll.isPending
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <DollarSign className="w-4 h-4" />}
+                Settle All
+              </Button>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Category filters */}
+      {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Category filter */}
         {['ALL', ...CATEGORIES].map((cat) => (
           <button
             key={cat}
@@ -224,13 +290,30 @@ export function ExpensesPage() {
             {cat === 'ALL' ? 'All' : fmtLabel(cat)}
           </button>
         ))}
+
+        <div className="w-px h-5 bg-slate-200 mx-1" />
+
+        {/* Settled filter */}
+        {(['all', 'pending', 'settled'] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setFilterSettled(s)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+              filterSettled === s
+                ? s === 'settled' ? 'bg-teal-100 text-teal-700' : s === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-slate-700 text-white'
+                : 'bg-white border border-slate-100 text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+          </button>
+        ))}
       </div>
 
       {/* Expense list */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">
-            {filtered?.length ?? 0} expense{(filtered?.length ?? 0) !== 1 ? 's' : ''}
+            {filtered.length} expense{filtered.length !== 1 ? 's' : ''}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -238,29 +321,38 @@ export function ExpensesPage() {
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
-          ) : !filtered || filtered.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-8">
-              No expenses yet. Click "Add Expense" to log one.
+              No expenses here yet.
             </p>
           ) : (
             <div className="space-y-1">
+              {/* Header */}
               <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
                 <div className="col-span-4">Description</div>
                 <div className="col-span-2">Category</div>
-                <div className="col-span-2">Date</div>
+                <div className="col-span-1">Date</div>
                 <div className="col-span-2">Paid by</div>
-                <div className="col-span-1 text-right">Amount</div>
+                <div className="col-span-2 text-right">Amount</div>
                 <div className="col-span-1" />
               </div>
+
               {filtered.map((expense) => {
                 const child = children?.find((c) => c.id === expense.childId)
+                const isSettling = settleExpense.isPending && settleExpense.variables?.expenseId === expense.id
+
                 return (
                   <div
                     key={expense.id}
-                    className="grid grid-cols-12 gap-2 px-3 py-3 rounded-xl hover:bg-slate-50 transition-colors items-center group"
+                    className={`grid grid-cols-12 gap-2 px-3 py-3 rounded-xl transition-colors items-center group ${
+                      expense.isSettled ? 'bg-slate-50 opacity-70' : 'hover:bg-slate-50'
+                    }`}
                   >
+                    {/* Description + child */}
                     <div className="col-span-4 min-w-0">
-                      <p className="text-sm font-medium text-slate-700 truncate">{expense.description}</p>
+                      <p className={`text-sm font-medium truncate ${expense.isSettled ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                        {expense.description}
+                      </p>
                       {child && (
                         <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
                           <span
@@ -270,35 +362,86 @@ export function ExpensesPage() {
                           {child.firstName}
                         </p>
                       )}
+                      {expense.isSettled && expense.settledAt && (
+                        <p className="text-[9px] text-teal-500 mt-0.5">
+                          Settled {new Date(expense.settledAt).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
+
+                    {/* Category */}
                     <div className="col-span-2">
                       <span className={`text-xs px-2 py-0.5 rounded-lg font-medium border ${CATEGORY_COLORS[expense.category]}`}>
                         {fmtLabel(expense.category)}
                       </span>
                     </div>
-                    <div className="col-span-2 text-sm text-slate-400">
-                      {new Date(expense.date).toLocaleDateString()}
+
+                    {/* Date */}
+                    <div className="col-span-1 text-xs text-slate-400">
+                      {new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </div>
+
+                    {/* Paid by */}
                     <div className="col-span-2 text-sm text-slate-500">
                       {expense.paidBy === user?.id ? 'You' : expense.payer?.firstName ?? 'Other'}
+                      <span className="text-[10px] text-slate-400 ml-1">
+                        ({Math.round(parseFloat(expense.splitRatio) * 100)}% other)
+                      </span>
                     </div>
-                    <div className="col-span-1 text-right">
-                      <span className={`text-sm font-semibold ${expense.paidBy === user?.id ? 'text-teal-600' : 'text-slate-600'}`}>
+
+                    {/* Amount */}
+                    <div className="col-span-2 text-right">
+                      <span className={`text-sm font-semibold ${expense.isSettled ? 'text-slate-400' : expense.paidBy === user?.id ? 'text-teal-600' : 'text-slate-600'}`}>
                         {expense.currency ?? 'USD'} {parseFloat(expense.amount).toFixed(2)}
                       </span>
                     </div>
+
+                    {/* Actions */}
                     <div className="col-span-1 flex items-center justify-end gap-1">
                       {expense.receiptUrl && (
                         <a
                           href={expense.receiptUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1 rounded-lg text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+                          className="p-1 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
                           title="View receipt"
                         >
                           <FileText className="w-3.5 h-3.5" />
                         </a>
                       )}
+                      <div className="relative">
+                        {confirmSettleId === expense.id && (
+                          <div className="absolute right-0 bottom-full mb-1.5 flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl shadow-lg px-2.5 py-1.5 z-10 whitespace-nowrap">
+                            <span className="text-xs text-slate-600 font-medium">
+                              {expense.isSettled ? 'Mark as pending?' : 'Mark as settled?'}
+                            </span>
+                            <button
+                              onClick={() => setConfirmSettleId(null)}
+                              className="text-xs px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 font-medium"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => { void handleSettle(expense.id, expense.isSettled); setConfirmSettleId(null) }}
+                              disabled={isSettling}
+                              className="text-xs px-2 py-0.5 rounded-lg bg-teal-500 text-white font-medium disabled:opacity-60"
+                            >
+                              {isSettling ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Confirm'}
+                            </button>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => setConfirmSettleId(expense.id)}
+                          title={expense.isSettled ? 'Mark as pending' : 'Mark as settled'}
+                          className="p-1 rounded-lg text-slate-400 hover:text-teal-500 hover:bg-teal-50 transition-colors"
+                        >
+                          {isSettling
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : expense.isSettled
+                            ? <CheckCircle2 className="w-3.5 h-3.5 text-teal-500" />
+                            : <Circle className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                       <div className="relative">
                         {confirmDeleteId === expense.id && (
                           <div className="absolute right-0 bottom-full mb-1.5 flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl shadow-lg px-2.5 py-1.5 z-10 whitespace-nowrap">
@@ -320,7 +463,7 @@ export function ExpensesPage() {
                         )}
                         <button
                           onClick={() => setConfirmDeleteId(expense.id)}
-                          className="p-1 rounded-lg text-slate-200 hover:text-red-400 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                          className="p-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-50 transition-colors"
                           title="Delete expense"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -350,10 +493,7 @@ export function ExpensesPage() {
             <div className="space-y-1.5">
               <Label>Amount *</Label>
               <div className="flex gap-2">
-                <Select
-                  defaultValue="USD"
-                  onValueChange={(v) => setValue('currency', v)}
-                >
+                <Select defaultValue="USD" onValueChange={(v) => setValue('currency', v)}>
                   <SelectTrigger className="w-24 shrink-0">
                     <SelectValue />
                   </SelectTrigger>
@@ -364,10 +504,7 @@ export function ExpensesPage() {
                   </SelectContent>
                 </Select>
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
+                  type="number" step="0.01" min="0" placeholder="0.00"
                   className="flex-1"
                   {...register('amount')}
                 />
@@ -380,9 +517,7 @@ export function ExpensesPage() {
               <div className="space-y-1.5">
                 <Label>Category *</Label>
                 <Select onValueChange={(v) => setValue('category', v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a category..." />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select a category..." /></SelectTrigger>
                   <SelectContent>
                     {CATEGORIES.map((c) => (
                       <SelectItem key={c} value={c}>{fmtLabel(c)}</SelectItem>
@@ -416,28 +551,17 @@ export function ExpensesPage() {
                   <SelectContent>
                     <SelectItem value="_none">Not specific to one child</SelectItem>
                     {(children ?? []).map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.firstName} {c.lastName}
-                      </SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{c.firstName} {c.lastName}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex items-baseline justify-between">
-                  <Label>Split Ratio</Label>
-                  <span className="text-[10px] text-slate-400">
-                    You {Math.round((1 - watchSplit) * 100)}% / Other {Math.round(watchSplit * 100)}%
-                  </span>
-                </div>
+                <Label>Split Ratio</Label>
                 <div className="flex items-center gap-2">
                   <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    placeholder="50"
+                    type="number" min="0" max="100" step="1" placeholder="50"
                     value={Math.round(watchSplit * 100)}
                     onChange={(e) => {
                       const pct = Math.min(100, Math.max(0, Number(e.target.value)))
@@ -446,32 +570,29 @@ export function ExpensesPage() {
                   />
                   <span className="text-sm text-slate-400 shrink-0">%</span>
                 </div>
+                <p className="text-[10px] text-slate-400">
+                  You {Math.round((1 - watchSplit) * 100)}% / Other {Math.round(watchSplit * 100)}%
+                </p>
               </div>
             </div>
 
-            {/* Receipt upload */}
+            {/* Receipt */}
             <div className="space-y-1.5">
               <Label>Receipt (optional)</Label>
               {receiptFile ? (
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50">
                   <FileText className="w-4 h-4 text-slate-400 shrink-0" />
                   <span className="text-sm text-slate-600 flex-1 truncate">{receiptFile.name}</span>
-                  {uploadReceipt.isPending && (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400 shrink-0" />
-                  )}
-                  <button
-                    type="button"
-                    onClick={clearReceipt}
-                    className="p-0.5 rounded text-slate-400 hover:text-slate-600"
-                  >
+                  {uploadReceipt.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400 shrink-0" />}
+                  <button type="button" onClick={clearReceipt} className="p-0.5 rounded text-slate-400 hover:text-slate-600">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ) : (
                 <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-slate-300 hover:border-teal-400 hover:bg-teal-50 transition-all cursor-pointer">
-                  <ExternalLink className="w-4 h-4 text-slate-400" />
+                  <Receipt className="w-4 h-4 text-slate-400" />
                   <span className="text-sm text-slate-500">Choose file…</span>
-                  <span className="text-xs text-slate-400 ml-auto">JPEG, PNG, GIF, WebP, PDF (max 10MB)</span>
+                  <span className="text-xs text-slate-400 ml-auto">JPEG, PNG, PDF (max 10 MB)</span>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -488,9 +609,7 @@ export function ExpensesPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting || uploadReceipt.isPending}>
-                {(isSubmitting || uploadReceipt.isPending) && (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                )}
+                {(isSubmitting || uploadReceipt.isPending) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                 Add Expense
               </Button>
             </DialogFooter>

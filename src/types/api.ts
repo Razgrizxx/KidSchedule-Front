@@ -85,8 +85,15 @@ export interface Expense {
   date: string
   receiptUrl?: string
   splitRatio: string
+  isSettled: boolean
+  settledAt?: string
   createdAt: string
   payer?: AuthUser
+}
+
+export interface ExpenseBalance {
+  members: { user: { id: string; firstName: string; lastName: string }; balance: number }[]
+  summary: { pendingCount: number; settledCount: number; totalSettled: number }
 }
 
 export type ExpenseCategory =

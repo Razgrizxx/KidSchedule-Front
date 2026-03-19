@@ -5,16 +5,22 @@ import type { Schedule, CustodyEvent, CustodyPattern } from '@/types/api'
 export function useSchedules(familyId?: string) {
   return useQuery<Schedule[]>({
     queryKey: ['schedules', familyId],
-    queryFn: () => api.get(`/schedule/${familyId}`).then((r) => r.data),
+    queryFn: () => api.get(`/families/${familyId}/schedules`).then((r) => r.data),
     enabled: !!familyId,
   })
 }
 
 export function useCustodyEvents(familyId?: string, month?: string) {
+  // month is "YYYY-MM" — split into year and month number for the backend
+  const [year, mon] = month ? month.split('-').map(Number) : [undefined, undefined]
   return useQuery<CustodyEvent[]>({
     queryKey: ['custody-events', familyId, month],
     queryFn: () =>
-      api.get(`/schedule/${familyId}/events`, { params: { month } }).then((r) => r.data),
+      api
+        .get(`/families/${familyId}/schedules/calendar`, {
+          params: { year, month: mon },
+        })
+        .then((r) => r.data),
     enabled: !!familyId && !!month,
   })
 }
@@ -32,7 +38,10 @@ interface CreateScheduleDto {
 export function useCreateSchedule() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (dto: CreateScheduleDto) => api.post('/schedule', dto).then((r) => r.data),
+    mutationFn: ({ familyId, ...body }: CreateScheduleDto) =>
+      api
+        .post(`/families/${familyId}/schedules`, body)
+        .then((r) => r.data),
     onSuccess: (_data, variables) => {
       void qc.invalidateQueries({ queryKey: ['schedules', variables.familyId] })
       void qc.invalidateQueries({ queryKey: ['custody-events', variables.familyId] })

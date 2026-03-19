@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, CalendarPlus, Loader2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -20,13 +20,25 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useFamilies, useChildren } from '@/hooks/useDashboard'
 import { useSchedules, useCustodyEvents, useCreateSchedule } from '@/hooks/useCalendar'
 import { toast } from '@/hooks/use-toast'
-import type { CustodyPattern } from '@/types/api'
+import type { CustodyPattern, FamilyMember } from '@/types/api'
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+// Distinct palette for parents — different from child colors
+const PARENT_COLORS = [
+  '#14b8a6', // teal
+  '#6366f1', // indigo
+  '#f97316', // orange
+  '#ec4899', // pink
+  '#8b5cf6', // violet
+  '#0ea5e9', // sky
+]
 
 const PATTERNS: { value: CustodyPattern; label: string; desc: string }[] = [
   { value: 'ALTERNATING_WEEKS', label: 'Alternating Weeks', desc: 'One full week with each parent, alternating.' },
@@ -35,6 +47,19 @@ const PATTERNS: { value: CustodyPattern; label: string; desc: string }[] = [
   { value: 'FIVE_TWO_TWO_FIVE', label: '5-2-2-5', desc: '5 days / 2 days / 2 days / 5 days cycle.' },
   { value: 'EVERY_OTHER_WEEKEND', label: 'Every Other Weekend', desc: 'Lives with one parent; visits every other weekend.' },
 ]
+
+const scheduleSchema = z.object({
+  childId: z.string().min(1, 'Select a child'),
+  pattern: z.string().min(1, 'Select a pattern'),
+  startDate: z.string().min(1, 'Select a start date'),
+  name: z.string().min(1, 'Give this schedule a name'),
+  parent1Id: z.string().min(1, 'Select parent A'),
+  parent2Id: z.string().min(1, 'Select parent B'),
+})
+
+type ScheduleForm = z.infer<typeof scheduleSchema>
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function buildMonthGrid(year: number, month: number): (number | null)[] {
   const firstDay = new Date(year, month, 1).getDay()
@@ -49,16 +74,17 @@ function toISO(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
-const scheduleSchema = z.object({
-  childId: z.string().min(1, 'Select a child'),
-  pattern: z.string().min(1, 'Select a pattern'),
-  startDate: z.string().min(1, 'Select a start date'),
-  name: z.string().min(1, 'Give this schedule a name'),
-  parent1Id: z.string().min(1, 'Select parent A'),
-  parent2Id: z.string().min(1, 'Select parent B'),
-})
+/** Assign a stable color to each parent by their position in the members array */
+function buildParentColorMap(members: FamilyMember[]): Map<string, string> {
+  const parents = members.filter((m) => m.role === 'PARENT')
+  const map = new Map<string, string>()
+  parents.forEach((m, i) => {
+    map.set(m.userId, PARENT_COLORS[i % PARENT_COLORS.length])
+  })
+  return map
+}
 
-type ScheduleForm = z.infer<typeof scheduleSchema>
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export function CalendarPage() {
   const today = new Date()
@@ -66,13 +92,15 @@ export function CalendarPage() {
   const [month, setMonth] = useState(today.getMonth())
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null)
 
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
 
   const { data: families } = useFamilies()
-  const familyId = families?.[0]?.id
+  const family = families?.[0]
+  const familyId = family?.id
   const { data: children, isLoading: childrenLoading } = useChildren(familyId)
-  const { data: custodyEvents, isLoading: eventsLoading } = useCustodyEvents(familyId, monthKey)
+  const { data: allCustodyEvents, isLoading: eventsLoading } = useCustodyEvents(familyId, monthKey)
   const { data: schedules } = useSchedules(familyId)
   const createSchedule = useCreateSchedule()
 
@@ -81,13 +109,33 @@ export function CalendarPage() {
   })
   const watchPattern = watch('pattern')
 
-  // Build day → custodian map
-  const custodyMap = new Map<string, string>()
-  custodyEvents?.forEach((ev) => custodyMap.set(ev.date, ev.custodianId))
+  // Parent color map — stable colors assigned by family member order
+  const parentColorMap = useMemo(
+    () => buildParentColorMap(family?.members ?? []),
+    [family?.members],
+  )
 
-  // Child color map
-  const childColorMap = new Map<string, string>()
-  children?.forEach((c) => childColorMap.set(c.id, c.color ?? '#66CCCC'))
+  // Parents list for the legend
+  const parents = useMemo(
+    () => (family?.members ?? []).filter((m) => m.role === 'PARENT'),
+    [family?.members],
+  )
+
+  // Filter events by selected child (null = all)
+  const custodyEvents = useMemo(
+    () =>
+      selectedChildId
+        ? (allCustodyEvents ?? []).filter((e) => e.childId === selectedChildId)
+        : (allCustodyEvents ?? []),
+    [allCustodyEvents, selectedChildId],
+  )
+
+  // Build date → custodianId map (date normalized to YYYY-MM-DD)
+  const custodyMap = useMemo(() => {
+    const map = new Map<string, string>()
+    custodyEvents.forEach((ev) => map.set(ev.date.slice(0, 10), ev.custodianId))
+    return map
+  }, [custodyEvents])
 
   const days = buildMonthGrid(year, month)
 
@@ -123,7 +171,9 @@ export function CalendarPage() {
   }
 
   const selectedDateStr = selectedDay ? toISO(year, month, selectedDay) : null
-  const selectedDayEvents = custodyEvents?.filter((e) => e.date === selectedDateStr) ?? []
+  const selectedDayEvents = (allCustodyEvents ?? []).filter(
+    (e) => e.date.slice(0, 10) === selectedDateStr,
+  )
 
   return (
     <div className="space-y-4 max-w-5xl">
@@ -156,6 +206,40 @@ export function CalendarPage() {
               </button>
             </div>
 
+            {/* Child filter tabs */}
+            {children && children.length > 1 && (
+              <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+                <button
+                  onClick={() => setSelectedChildId(null)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all border ${
+                    selectedChildId === null
+                      ? 'bg-slate-800 text-white border-slate-800'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  All children
+                </button>
+                {children.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedChildId(c.id)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all border ${
+                      selectedChildId === c.id
+                        ? 'text-white border-transparent'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                    }`}
+                    style={
+                      selectedChildId === c.id
+                        ? { backgroundColor: c.color, borderColor: c.color }
+                        : {}
+                    }
+                  >
+                    {c.firstName}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Day labels */}
             <div className="grid grid-cols-7 mb-1">
               {DAYS.map((d) => (
@@ -177,6 +261,7 @@ export function CalendarPage() {
 
                   const iso = toISO(year, month, day)
                   const custodianId = custodyMap.get(iso)
+                  const parentColor = custodianId ? parentColorMap.get(custodianId) : undefined
                   const isToday =
                     day === today.getDate() &&
                     month === today.getMonth() &&
@@ -189,14 +274,17 @@ export function CalendarPage() {
                       onClick={() => setSelectedDay(day)}
                       className={`
                         relative h-10 rounded-xl text-sm font-medium transition-all
-                        ${isSelected ? 'ring-2 ring-teal-400 ring-offset-1' : ''}
+                        ${isSelected ? 'ring-2 ring-offset-1' : ''}
                         ${isToday ? 'font-bold' : ''}
-                        ${custodianId ? 'text-white' : 'text-slate-600 hover:bg-slate-50'}
+                        ${parentColor ? 'text-white' : 'text-slate-600 hover:bg-slate-50'}
                       `}
-                      style={custodianId ? { backgroundColor: childColorMap.get(custodianId) ?? '#66CCCC' } : {}}
+                      style={{
+                        backgroundColor: parentColor ?? undefined,
+                        ...(isSelected ? { ringColor: parentColor ?? '#14b8a6' } : {}),
+                      }}
                     >
                       {day}
-                      {isToday && !custodianId && (
+                      {isToday && !parentColor && (
                         <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-teal-400" />
                       )}
                     </button>
@@ -209,34 +297,72 @@ export function CalendarPage() {
 
         {/* Right panel */}
         <div className="space-y-4">
-          {/* Legend */}
+          {/* Parent color legend */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Children</CardTitle>
+              <CardTitle className="text-sm">Parents</CardTitle>
             </CardHeader>
             <CardContent>
-              {childrenLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-6 w-full" />
-                  <Skeleton className="h-6 w-3/4" />
+              {parents.length === 0 ? (
+                <p className="text-xs text-slate-400">No parents found.</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {parents.map((m) => {
+                    const color = parentColorMap.get(m.userId) ?? '#94a3b8'
+                    return (
+                      <div key={m.userId} className="flex items-center gap-2.5">
+                        <div
+                          className="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center text-white text-xs font-bold"
+                          style={{ backgroundColor: color }}
+                        >
+                          {m.user.firstName[0]}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">
+                            {m.user.firstName} {m.user.lastName}
+                          </p>
+                          <p className="text-[10px] text-slate-400 uppercase tracking-wide">
+                            Custody days
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              ) : children && children.length > 0 ? (
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Children legend */}
+          {children && children.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Children</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-2">
                   {children.map((c) => (
-                    <div key={c.id} className="flex items-center gap-2">
+                    <button
+                      key={c.id}
+                      onClick={() => setSelectedChildId(selectedChildId === c.id ? null : c.id)}
+                      className={`w-full flex items-center gap-2 p-2 rounded-xl transition-all text-left ${
+                        selectedChildId === c.id ? 'bg-slate-100' : 'hover:bg-slate-50'
+                      }`}
+                    >
                       <div
                         className="w-3 h-3 rounded-full shrink-0"
                         style={{ backgroundColor: c.color ?? '#66CCCC' }}
                       />
                       <span className="text-sm text-slate-700">{c.firstName} {c.lastName}</span>
-                    </div>
+                      {selectedChildId === c.id && (
+                        <span className="ml-auto text-[10px] text-slate-400">filtered</span>
+                      )}
+                    </button>
                   ))}
                 </div>
-              ) : (
-                <p className="text-xs text-slate-400">No children added yet.</p>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Selected day detail */}
           {selectedDay && (
@@ -251,16 +377,22 @@ export function CalendarPage() {
                   <div className="space-y-2">
                     {selectedDayEvents.map((ev) => {
                       const child = children?.find((c) => c.id === ev.childId)
+                      const custodian = parents.find((p) => p.userId === ev.custodianId)
+                      const color = parentColorMap.get(ev.custodianId) ?? '#94a3b8'
                       return (
-                        <div key={ev.id} className="flex items-center gap-2">
+                        <div key={ev.id} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50">
                           <div
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: child?.color ?? '#66CCCC' }}
+                            className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
+                            style={{ backgroundColor: color }}
                           />
-                          <span className="text-sm text-slate-700">
-                            {child?.firstName ?? 'Child'} — Custody day
-                            {ev.isOverride && ' (override)'}
-                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">
+                              {child?.firstName ?? 'Child'} with {custodian?.user.firstName ?? 'parent'}
+                            </p>
+                            {ev.isOverride && (
+                              <p className="text-[10px] text-amber-500 font-medium">Override</p>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
@@ -278,17 +410,32 @@ export function CalendarPage() {
               <CardTitle className="text-sm">Active Schedules</CardTitle>
             </CardHeader>
             <CardContent>
-              {schedules && schedules.length > 0 ? (
+              {childrenLoading ? (
+                <Skeleton className="h-8 w-full" />
+              ) : schedules && schedules.length > 0 ? (
                 <div className="space-y-2">
-                  {schedules.filter((s) => s.isActive).map((s) => (
-                    <div key={s.id} className="text-sm">
-                      <p className="font-medium text-slate-700">{s.name}</p>
-                      <p className="text-xs text-slate-400">{s.pattern.replace(/_/g, ' ')}</p>
-                    </div>
-                  ))}
+                  {schedules.filter((s) => s.isActive).map((s) => {
+                    const child = children?.find((c) => c.id === s.childId)
+                    return (
+                      <div key={s.id} className="flex items-center gap-2 text-sm">
+                        {child && (
+                          <div
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: child.color }}
+                          />
+                        )}
+                        <div>
+                          <p className="font-medium text-slate-700">{s.name}</p>
+                          <p className="text-xs text-slate-400">{s.pattern.replace(/_/g, ' ')}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               ) : (
-                <p className="text-xs text-slate-400">No active schedules. Click "Setup Schedule" to begin.</p>
+                <p className="text-xs text-slate-400">
+                  No active schedules. Click "Setup Schedule" to begin.
+                </p>
               )}
             </CardContent>
           </Card>
@@ -306,14 +453,12 @@ export function CalendarPage() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Schedule name */}
             <div className="space-y-1.5">
               <Label>Schedule name</Label>
               <Input placeholder="e.g. Weekly alternating" {...register('name')} />
               {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
             </div>
 
-            {/* Child */}
             <div className="space-y-1.5">
               <Label>Child</Label>
               {childrenLoading ? (
@@ -335,7 +480,6 @@ export function CalendarPage() {
               {errors.childId && <p className="text-xs text-red-500">{errors.childId.message}</p>}
             </div>
 
-            {/* Pattern */}
             <div className="space-y-1.5">
               <Label>Custody pattern</Label>
               <Select onValueChange={(v) => setValue('pattern', v)}>
@@ -356,14 +500,12 @@ export function CalendarPage() {
               {errors.pattern && <p className="text-xs text-red-500">{errors.pattern.message}</p>}
             </div>
 
-            {/* Start date */}
             <div className="space-y-1.5">
               <Label>Start date</Label>
               <Input type="date" {...register('startDate')} />
               {errors.startDate && <p className="text-xs text-red-500">{errors.startDate.message}</p>}
             </div>
 
-            {/* Parent selectors */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Parent A (starts custody)</Label>
@@ -372,7 +514,7 @@ export function CalendarPage() {
                     <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {families?.[0]?.members.filter((m) => m.role === 'PARENT').map((m) => (
+                    {parents.map((m) => (
                       <SelectItem key={m.userId} value={m.userId}>
                         {m.user.firstName} {m.user.lastName}
                       </SelectItem>
@@ -388,7 +530,7 @@ export function CalendarPage() {
                     <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {families?.[0]?.members.filter((m) => m.role === 'PARENT').map((m) => (
+                    {parents.map((m) => (
                       <SelectItem key={m.userId} value={m.userId}>
                         {m.user.firstName} {m.user.lastName}
                       </SelectItem>

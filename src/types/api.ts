@@ -150,6 +150,28 @@ export interface Caregiver {
   updatedAt: string
 }
 
+export type EventType = 'CUSTODY_TIME' | 'SCHOOL' | 'MEDICAL' | 'ACTIVITY' | 'VACATION' | 'OTHER'
+export type EventVisibility = 'SHARED' | 'PRIVATE'
+export type RepeatPattern = 'NONE' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'YEARLY'
+
+export interface CalendarEvent {
+  id: string
+  familyId: string
+  createdBy: string
+  title: string
+  type: EventType
+  visibility: EventVisibility
+  startAt: string
+  endAt: string
+  allDay: boolean
+  repeat: RepeatPattern
+  notes?: string
+  assignedToId?: string
+  assignedTo?: { id: string; firstName: string; lastName: string }
+  children: { child: { id: string; firstName: string; lastName: string; color: string } }[]
+  createdAt: string
+}
+
 export type AppearanceTheme = 'FRIENDLY' | 'MODERN' | 'MINIMAL'
 export type TimeFormat = 'TWELVE_HOUR' | 'TWENTY_FOUR_HOUR'
 

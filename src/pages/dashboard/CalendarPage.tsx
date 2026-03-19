@@ -18,8 +18,9 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useFamilies, useChildren } from '@/hooks/useDashboard'
-import { useSchedules, useCustodyEvents, useCreateSchedule } from '@/hooks/useCalendar'
+import { useSchedules, useCustodyEvents, useCreateSchedule, useEvents } from '@/hooks/useCalendar'
 import { toast } from '@/hooks/use-toast'
+import { AddEventModal } from '@/components/dashboard/AddEventModal'
 import type { CustodyPattern, FamilyMember } from '@/types/api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -93,6 +94,8 @@ export function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null)
+  const [addEventOpen, setAddEventOpen] = useState(false)
+  const [addEventDate, setAddEventDate] = useState<string | undefined>(undefined)
 
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
 
@@ -101,6 +104,7 @@ export function CalendarPage() {
   const familyId = family?.id
   const { data: children, isLoading: childrenLoading } = useChildren(familyId)
   const { data: allCustodyEvents, isLoading: eventsLoading } = useCustodyEvents(familyId, monthKey)
+  const { data: calendarEvents } = useEvents(familyId, monthKey)
   const { data: schedules } = useSchedules(familyId)
   const createSchedule = useCreateSchedule()
 
@@ -174,6 +178,9 @@ export function CalendarPage() {
   const selectedDayEvents = (allCustodyEvents ?? []).filter(
     (e) => e.date.slice(0, 10) === selectedDateStr,
   )
+  const selectedDayCalendarEvents = (calendarEvents ?? []).filter(
+    (e) => e.startAt.slice(0, 10) === selectedDateStr,
+  )
 
   return (
     <div className="space-y-4 max-w-5xl">
@@ -183,10 +190,20 @@ export function CalendarPage() {
           <h2 className="text-xl font-bold text-slate-800">Family Calendar</h2>
           <p className="text-sm text-slate-400">Custody schedule at a glance</p>
         </div>
-        <Button onClick={() => setWizardOpen(true)} className="gap-2">
-          <CalendarPlus className="w-4 h-4" />
-          Setup Schedule
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => { setAddEventDate(undefined); setAddEventOpen(true) }}
+            className="gap-2"
+          >
+            <CalendarPlus className="w-4 h-4" />
+            Add Event
+          </Button>
+          <Button onClick={() => setWizardOpen(true)} className="gap-2">
+            <CalendarPlus className="w-4 h-4" />
+            Setup Schedule
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -267,6 +284,9 @@ export function CalendarPage() {
                     month === today.getMonth() &&
                     year === today.getFullYear()
                   const isSelected = day === selectedDay
+                  const hasEvents = (calendarEvents ?? []).some(
+                    (e) => e.startAt.slice(0, 10) === iso,
+                  )
 
                   return (
                     <button
@@ -286,6 +306,12 @@ export function CalendarPage() {
                       {day}
                       {isToday && !parentColor && (
                         <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-teal-400" />
+                      )}
+                      {hasEvents && (
+                        <span
+                          className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: parentColor ? 'rgba(255,255,255,0.8)' : '#6366f1' }}
+                        />
                       )}
                     </button>
                   )
@@ -368,37 +394,59 @@ export function CalendarPage() {
           {selectedDay && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">
-                  {MONTHS[month]} {selectedDay}, {year}
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">
+                    {MONTHS[month]} {selectedDay}, {year}
+                  </CardTitle>
+                  <button
+                    onClick={() => {
+                      setAddEventDate(toISO(year, month, selectedDay))
+                      setAddEventOpen(true)
+                    }}
+                    className="text-xs text-teal-500 hover:text-teal-600 font-medium"
+                  >
+                    + Add
+                  </button>
+                </div>
               </CardHeader>
-              <CardContent>
-                {selectedDayEvents.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedDayEvents.map((ev) => {
-                      const child = children?.find((c) => c.id === ev.childId)
-                      const custodian = parents.find((p) => p.userId === ev.custodianId)
-                      const color = parentColorMap.get(ev.custodianId) ?? '#94a3b8'
-                      return (
-                        <div key={ev.id} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
-                            style={{ backgroundColor: color }}
-                          />
-                          <div>
-                            <p className="text-sm font-medium text-slate-700">
-                              {child?.firstName ?? 'Child'} with {custodian?.user.firstName ?? 'parent'}
-                            </p>
-                            {ev.isOverride && (
-                              <p className="text-[10px] text-amber-500 font-medium">Override</p>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
+              <CardContent className="space-y-1.5">
+                {selectedDayEvents.map((ev) => {
+                  const child = children?.find((c) => c.id === ev.childId)
+                  const custodian = parents.find((p) => p.userId === ev.custodianId)
+                  const color = parentColorMap.get(ev.custodianId) ?? '#94a3b8'
+                  return (
+                    <div key={ev.id} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50">
+                      <div
+                        className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
+                        style={{ backgroundColor: color }}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">
+                          {child?.firstName ?? 'Child'} with {custodian?.user.firstName ?? 'parent'}
+                        </p>
+                        {ev.isOverride && (
+                          <p className="text-[10px] text-amber-500 font-medium">Override</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                {selectedDayCalendarEvents.map((ev) => (
+                  <div key={ev.id} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-indigo-50 border border-indigo-100">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0 mt-1 bg-indigo-400" />
+                    <div>
+                      <p className="text-sm font-medium text-indigo-800">{ev.title}</p>
+                      <p className="text-[10px] text-indigo-400">
+                        {ev.allDay
+                          ? 'All day'
+                          : `${ev.startAt.slice(11, 16)} – ${ev.endAt.slice(11, 16)}`}
+                        {ev.visibility === 'PRIVATE' && ' · Private'}
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-400">No custody events on this day.</p>
+                ))}
+                {selectedDayEvents.length === 0 && selectedDayCalendarEvents.length === 0 && (
+                  <p className="text-xs text-slate-400">No events on this day.</p>
                 )}
               </CardContent>
             </Card>
@@ -441,6 +489,18 @@ export function CalendarPage() {
           </Card>
         </div>
       </div>
+
+      {/* Add Event modal */}
+      {familyId && children && (
+        <AddEventModal
+          open={addEventOpen}
+          onClose={() => setAddEventOpen(false)}
+          familyId={familyId}
+          children={children}
+          parents={parents}
+          defaultDate={addEventDate}
+        />
+      )}
 
       {/* Setup Schedule wizard */}
       <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>

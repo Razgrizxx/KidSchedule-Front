@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api'
-import type { Schedule, CustodyEvent, CustodyPattern } from '@/types/api'
+import type { Schedule, CustodyEvent, CustodyPattern, CalendarEvent, EventType, EventVisibility, RepeatPattern } from '@/types/api'
 
 export function useSchedules(familyId?: string) {
   return useQuery<Schedule[]>({
@@ -45,6 +45,40 @@ export function useCreateSchedule() {
     onSuccess: (_data, variables) => {
       void qc.invalidateQueries({ queryKey: ['schedules', variables.familyId] })
       void qc.invalidateQueries({ queryKey: ['custody-events', variables.familyId] })
+    },
+  })
+}
+
+export function useEvents(familyId?: string, month?: string) {
+  return useQuery<CalendarEvent[]>({
+    queryKey: ['events', familyId, month],
+    queryFn: () =>
+      api.get(`/families/${familyId}/events`, { params: { month } }).then((r) => r.data),
+    enabled: !!familyId,
+  })
+}
+
+interface CreateEventDto {
+  familyId: string
+  title: string
+  type: EventType
+  visibility: EventVisibility
+  startAt: string
+  endAt: string
+  allDay?: boolean
+  repeat: RepeatPattern
+  notes?: string
+  assignedToId?: string
+  childIds: string[]
+}
+
+export function useCreateEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ familyId, ...body }: CreateEventDto) =>
+      api.post(`/families/${familyId}/events`, body).then((r) => r.data),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['events', variables.familyId] })
     },
   })
 }

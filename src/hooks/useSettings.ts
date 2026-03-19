@@ -2,6 +2,42 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api'
 import type { FamilySettings, UserSettings } from '@/types/api'
 
+// ── Google Calendar integration ───────────────────────────────────────────────
+
+export function useGoogleStatus() {
+  return useQuery<{ connected: boolean }>({
+    queryKey: ['googleStatus'],
+    queryFn: () => api.get('/auth/google/status').then((r) => r.data),
+  })
+}
+
+export function useGoogleAuthUrl() {
+  return useMutation({
+    mutationFn: () => api.get<{ url: string }>('/auth/google/url').then((r) => r.data.url),
+  })
+}
+
+export function useGoogleDisconnect() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.delete('/auth/google/disconnect').then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['googleStatus'] })
+    },
+  })
+}
+
+export function useGoogleSync(familyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      api.get<{ synced: number }>(`/auth/google/sync/${familyId}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['googleStatus'] })
+    },
+  })
+}
+
 export function useFamilySettings(familyId?: string) {
   return useQuery<FamilySettings>({
     queryKey: ['familySettings', familyId],

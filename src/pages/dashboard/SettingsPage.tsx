@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Globe, Calendar, Bell, Paintbrush, Check } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Globe, Calendar, Bell, Paintbrush, Check, Link2, Link2Off, RefreshCw, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -11,6 +12,10 @@ import {
   useUpdateFamilySettings,
   useUserSettings,
   useUpdateUserSettings,
+  useGoogleStatus,
+  useGoogleAuthUrl,
+  useGoogleDisconnect,
+  useGoogleSync,
 } from '@/hooks/useSettings'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/hooks/use-toast'
@@ -160,6 +165,51 @@ export function SettingsPage() {
   // Data
   const { data: families, isLoading: loadingFamilies } = useFamilies()
   const familyId = families?.[0]?.id
+
+  // Google Calendar OAuth redirect feedback
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const google = searchParams.get('google')
+    if (google === 'connected') {
+      toast({ title: 'Google Calendar connected!', variant: 'success' })
+      setSearchParams((prev) => { prev.delete('google'); return prev })
+    } else if (google === 'error') {
+      toast({ title: 'Could not connect Google Calendar', variant: 'error' })
+      setSearchParams((prev) => { prev.delete('google'); return prev })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { data: googleStatus } = useGoogleStatus()
+  const googleAuthUrl = useGoogleAuthUrl()
+  const googleDisconnect = useGoogleDisconnect()
+  const googleSync = useGoogleSync(familyId)
+
+  async function handleGoogleConnect() {
+    try {
+      const url = await googleAuthUrl.mutateAsync()
+      window.location.href = url
+    } catch {
+      toast({ title: 'Could not get Google auth URL', variant: 'error' })
+    }
+  }
+
+  async function handleGoogleDisconnect() {
+    try {
+      await googleDisconnect.mutateAsync()
+      toast({ title: 'Google Calendar disconnected', variant: 'success' })
+    } catch {
+      toast({ title: 'Could not disconnect', variant: 'error' })
+    }
+  }
+
+  async function handleGoogleSync() {
+    try {
+      const result = await googleSync.mutateAsync()
+      toast({ title: `${result.synced} events synced to Google Calendar`, variant: 'success' })
+    } catch {
+      toast({ title: 'Sync failed', variant: 'error' })
+    }
+  }
 
   const { data: familySettings, isLoading: loadingFamilyQuery } = useFamilySettings(familyId)
   const { data: userSettings, isLoading: loadingUser } = useUserSettings()
@@ -396,6 +446,80 @@ export function SettingsPage() {
               </SettingRow>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── Integrations ─────────────────────────────────────────────────── */}
+      <Card>
+        <SectionHeader
+          icon={Link2}
+          title="Integrations"
+          description="Connect external calendars and services"
+          saved={false}
+        />
+        <CardContent className="pt-2">
+          <SettingRow>
+            <div className="flex items-center gap-3">
+              {/* Google Calendar logo */}
+              <div className="w-9 h-9 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center shrink-0">
+                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+                  <path d="M19.5 3h-15A1.5 1.5 0 003 4.5v15A1.5 1.5 0 004.5 21h15a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 0019.5 3z" fill="#fff" stroke="#ddd"/>
+                  <path d="M16.5 3v4.5M7.5 3v4.5M3 9h18" stroke="#4285F4" strokeWidth="1.5" strokeLinecap="round"/>
+                  <text x="6.5" y="17" fontSize="7" fontWeight="bold" fill="#4285F4" fontFamily="sans-serif">G</text>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Google Calendar</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {googleStatus?.connected
+                    ? 'Events sync automatically when you add or update them'
+                    : 'Push your KidSchedule events to Google Calendar'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {googleStatus?.connected ? (
+                <>
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-teal-600 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+                    Connected
+                  </span>
+                  <button
+                    onClick={() => void handleGoogleSync()}
+                    disabled={googleSync.isPending || !familyId}
+                    title="Sync all upcoming events now"
+                    className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-teal-500 disabled:opacity-40 transition-colors"
+                  >
+                    {googleSync.isPending
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <RefreshCw className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={() => void handleGoogleDisconnect()}
+                    disabled={googleDisconnect.isPending}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors font-medium"
+                  >
+                    {googleDisconnect.isPending
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Link2Off className="w-3.5 h-3.5" />}
+                    Disconnect
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => void handleGoogleConnect()}
+                  disabled={googleAuthUrl.isPending}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-600 text-white disabled:opacity-60 transition-colors font-medium shadow-sm"
+                >
+                  {googleAuthUrl.isPending
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Link2 className="w-3.5 h-3.5" />}
+                  Connect Google Calendar
+                </button>
+              )}
+            </div>
+          </SettingRow>
         </CardContent>
       </Card>
 

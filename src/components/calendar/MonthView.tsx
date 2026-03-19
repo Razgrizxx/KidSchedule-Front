@@ -82,34 +82,6 @@ export function MonthView({
 
   return (
     <div>
-      {/* Child filter tabs */}
-      {children.length > 1 && (
-        <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-          {children.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => {
-                // toggle handled by parent via selectedChildId prop changes
-                // but we need to call up — actually we just set selectedChildId via onSelectDay hack
-                // Use a dedicated callback instead; for now handled in CalendarPage
-              }}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all border ${
-                selectedChildId === c.id
-                  ? 'text-white border-transparent'
-                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-              }`}
-              style={
-                selectedChildId === c.id
-                  ? { backgroundColor: c.color, borderColor: c.color }
-                  : {}
-              }
-            >
-              {c.firstName}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Day-of-week labels */}
       <div className="grid grid-cols-7 mb-1">
         {DAYS_SHORT.map((d) => (

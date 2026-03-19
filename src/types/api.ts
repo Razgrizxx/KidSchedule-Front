@@ -69,6 +69,7 @@ export interface Message {
   previousHash: string
   status: 'SENT' | 'DELIVERED' | 'READ'
   attachmentUrl?: string
+  isSystemMessage: boolean
   createdAt: string
   sender?: AuthUser
 }

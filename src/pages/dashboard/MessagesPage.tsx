@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, ShieldCheck, ShieldAlert, FileDown, Hash, Bot } from 'lucide-react'
+import { Send, ShieldCheck, ShieldAlert, FileDown, Hash, Bot, Phone, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/store/authStore'
 import { useFamilies } from '@/hooks/useDashboard'
 import {
@@ -13,6 +14,7 @@ import {
   useMarkMessagesRead,
   useVerifyChain,
 } from '@/hooks/useMessages'
+import { useSendPhoneCode, useVerifyPhone } from '@/hooks/useSettings'
 import { toast } from '@/hooks/use-toast'
 import type { Message } from '@/types/api'
 import { cn } from '@/lib/utils'
@@ -232,6 +234,107 @@ function MessageBubble({
   )
 }
 
+// ── Phone verification gate ───────────────────────────────────────────────────
+
+function PhoneVerificationGate() {
+  const [phone, setPhone] = useState('')
+  const [code, setCode] = useState('')
+  const [codeSent, setCodeSent] = useState(false)
+
+  const sendCode = useSendPhoneCode()
+  const verifyPhone = useVerifyPhone()
+
+  async function handleSendCode() {
+    if (!phone.trim()) return
+    try {
+      await sendCode.mutateAsync(phone.trim())
+      setCodeSent(true)
+      toast({ title: 'Verification code sent', variant: 'success' })
+    } catch {
+      toast({ title: 'Failed to send code', variant: 'error' })
+    }
+  }
+
+  async function handleVerify() {
+    if (!code.trim()) return
+    try {
+      await verifyPhone.mutateAsync({ phone: phone.trim(), code: code.trim() })
+      toast({ title: 'Phone verified! You can now use messaging.', variant: 'success' })
+    } catch {
+      toast({ title: 'Invalid or expired code', variant: 'error' })
+    }
+  }
+
+  return (
+    <div className="max-w-3xl h-[calc(100vh-8rem)] flex flex-col items-center justify-center">
+      <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-8 w-full max-w-md text-center">
+        <div className="w-14 h-14 rounded-2xl bg-teal-50 flex items-center justify-center mx-auto mb-4">
+          <ShieldCheck className="w-7 h-7 text-teal-500" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800 mb-1">Phone Verification Required</h3>
+        <p className="text-sm text-slate-400 mb-6">
+          Messaging is restricted to verified users to ensure legal integrity of the record.
+          Verify your phone number to continue.
+        </p>
+
+        <div className="space-y-4 text-left">
+          <div className="space-y-1.5">
+            <Label>Phone Number</Label>
+            <div className="flex gap-2">
+              <Input
+                type="tel"
+                placeholder="+1 555 000 0000"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={codeSent}
+              />
+              <Button
+                variant="outline"
+                onClick={() => void handleSendCode()}
+                disabled={!phone.trim() || sendCode.isPending || codeSent}
+                className="shrink-0 gap-1.5"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                {codeSent ? 'Sent' : 'Send Code'}
+              </Button>
+            </div>
+          </div>
+
+          {codeSent && (
+            <div className="space-y-1.5">
+              <Label>Verification Code</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="6-digit code"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+                <Button
+                  onClick={() => void handleVerify()}
+                  disabled={code.length < 6 || verifyPhone.isPending}
+                  className="shrink-0 gap-1.5"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  Verify
+                </Button>
+              </div>
+              <button
+                className="text-xs text-slate-400 hover:text-slate-600"
+                onClick={() => { setCodeSent(false); setCode('') }}
+              >
+                Use a different number
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function MessagesPage() {
@@ -285,6 +388,8 @@ export function MessagesPage() {
   }
 
   const chainValid = chain?.isValid ?? true
+
+  if (!user?.isVerified) return <PhoneVerificationGate />
 
   return (
     <div className="max-w-3xl h-[calc(100vh-8rem)] flex flex-col">

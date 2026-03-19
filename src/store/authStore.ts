@@ -7,6 +7,7 @@ export interface AuthUser {
   firstName: string
   lastName: string
   email: string
+  isVerified: boolean
 }
 
 export interface CaregiverData {

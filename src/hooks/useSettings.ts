@@ -1,6 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api'
 import type { FamilySettings, UserSettings } from '@/types/api'
+import { useAuthStore } from '@/store/authStore'
+
+// ── Phone verification ────────────────────────────────────────────────────────
+
+export function useSendPhoneCode() {
+  return useMutation({
+    mutationFn: (phone: string) =>
+      api.post('/auth/phone/send', { phone }).then((r) => r.data),
+  })
+}
+
+export function useVerifyPhone() {
+  const setAuth = useAuthStore((s) => s.setAuth)
+  const user = useAuthStore((s) => s.user)
+  const token = useAuthStore((s) => s.token)
+  return useMutation({
+    mutationFn: ({ phone, code }: { phone: string; code: string }) =>
+      api.post('/auth/phone/verify', { phone, code }).then((r) => r.data),
+    onSuccess: () => {
+      // Mark the stored user as verified without requiring a new login
+      if (user && token) setAuth({ ...user, isVerified: true }, token)
+    },
+  })
+}
 
 // ── Google Calendar integration ───────────────────────────────────────────────
 

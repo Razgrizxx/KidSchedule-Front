@@ -1,5 +1,9 @@
-import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, CalendarPlus, Loader2 } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import {
+  ChevronLeft, ChevronRight, CalendarPlus, Loader2,
+  Home, GraduationCap, Stethoscope, Zap, Plane, CalendarDays,
+  Pencil, Trash2,
+} from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -18,10 +22,10 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useFamilies, useChildren } from '@/hooks/useDashboard'
-import { useSchedules, useCustodyEvents, useCreateSchedule, useEvents } from '@/hooks/useCalendar'
+import { useSchedules, useCustodyEvents, useCreateSchedule, useEvents, useDeleteEvent } from '@/hooks/useCalendar'
 import { toast } from '@/hooks/use-toast'
 import { AddEventModal } from '@/components/dashboard/AddEventModal'
-import type { CustodyPattern, FamilyMember } from '@/types/api'
+import type { CustodyPattern, FamilyMember, EventType, CalendarEvent } from '@/types/api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -40,6 +44,15 @@ const PARENT_COLORS = [
   '#8b5cf6', // violet
   '#0ea5e9', // sky
 ]
+
+const EVENT_TYPE_ICONS: Record<EventType, React.ElementType> = {
+  CUSTODY_TIME: Home,
+  SCHOOL: GraduationCap,
+  MEDICAL: Stethoscope,
+  ACTIVITY: Zap,
+  VACATION: Plane,
+  OTHER: CalendarDays,
+}
 
 const PATTERNS: { value: CustodyPattern; label: string; desc: string }[] = [
   { value: 'ALTERNATING_WEEKS', label: 'Alternating Weeks', desc: 'One full week with each parent, alternating.' },
@@ -94,8 +107,11 @@ export function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null)
+
   const [addEventOpen, setAddEventOpen] = useState(false)
   const [addEventDate, setAddEventDate] = useState<string | undefined>(undefined)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
 
@@ -103,10 +119,19 @@ export function CalendarPage() {
   const family = families?.[0]
   const familyId = family?.id
   const { data: children, isLoading: childrenLoading } = useChildren(familyId)
+
+  // Select first child by default once data loads
+  useEffect(() => {
+    if (children && children.length > 0 && selectedChildId === null) {
+      setSelectedChildId(children[0].id)
+    }
+  }, [children]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const { data: allCustodyEvents, isLoading: eventsLoading } = useCustodyEvents(familyId, monthKey)
   const { data: calendarEvents } = useEvents(familyId, monthKey)
   const { data: schedules } = useSchedules(familyId)
   const createSchedule = useCreateSchedule()
+  const deleteEvent = useDeleteEvent()
 
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } = useForm<ScheduleForm>({
     resolver: zodResolver(scheduleSchema),
@@ -125,13 +150,23 @@ export function CalendarPage() {
     [family?.members],
   )
 
-  // Filter events by selected child (null = all)
+  // Filter custody + calendar events by selected child (null = all)
   const custodyEvents = useMemo(
     () =>
       selectedChildId
         ? (allCustodyEvents ?? []).filter((e) => e.childId === selectedChildId)
         : (allCustodyEvents ?? []),
     [allCustodyEvents, selectedChildId],
+  )
+
+  const filteredCalendarEvents = useMemo(
+    () =>
+      selectedChildId
+        ? (calendarEvents ?? []).filter((e) =>
+            e.children.some((ec) => ec.child.id === selectedChildId),
+          )
+        : (calendarEvents ?? []),
+    [calendarEvents, selectedChildId],
   )
 
   // Build date → custodianId map (date normalized to YYYY-MM-DD)
@@ -147,11 +182,24 @@ export function CalendarPage() {
     if (month === 0) { setYear(y => y - 1); setMonth(11) }
     else setMonth(m => m - 1)
     setSelectedDay(null)
+    setConfirmDeleteId(null)
   }
   function nextMonth() {
     if (month === 11) { setYear(y => y + 1); setMonth(0) }
     else setMonth(m => m + 1)
     setSelectedDay(null)
+    setConfirmDeleteId(null)
+  }
+
+  async function handleDeleteEvent(eventId: string) {
+    if (!familyId) return
+    try {
+      await deleteEvent.mutateAsync({ familyId, eventId })
+      setConfirmDeleteId(null)
+      toast({ title: 'Event deleted', variant: 'success' })
+    } catch {
+      toast({ title: 'Failed to delete event', variant: 'error' })
+    }
   }
 
   async function onSubmit(data: ScheduleForm) {
@@ -178,7 +226,7 @@ export function CalendarPage() {
   const selectedDayEvents = (allCustodyEvents ?? []).filter(
     (e) => e.date.slice(0, 10) === selectedDateStr,
   )
-  const selectedDayCalendarEvents = (calendarEvents ?? []).filter(
+  const selectedDayCalendarEvents = filteredCalendarEvents.filter(
     (e) => e.startAt.slice(0, 10) === selectedDateStr,
   )
 
@@ -193,7 +241,10 @@ export function CalendarPage() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => { setAddEventDate(undefined); setAddEventOpen(true) }}
+            onClick={() => {
+              setAddEventDate(selectedDay ? toISO(year, month, selectedDay) : undefined)
+              setAddEventOpen(true)
+            }}
             className="gap-2"
           >
             <CalendarPlus className="w-4 h-4" />
@@ -226,16 +277,6 @@ export function CalendarPage() {
             {/* Child filter tabs */}
             {children && children.length > 1 && (
               <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-                <button
-                  onClick={() => setSelectedChildId(null)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all border ${
-                    selectedChildId === null
-                      ? 'bg-slate-800 text-white border-slate-800'
-                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  All children
-                </button>
                 {children.map((c) => (
                   <button
                     key={c.id}
@@ -268,7 +309,7 @@ export function CalendarPage() {
             {eventsLoading ? (
               <div className="grid grid-cols-7 gap-1">
                 {Array(35).fill(0).map((_, i) => (
-                  <Skeleton key={i} className="h-10 rounded-xl" />
+                  <Skeleton key={i} className="h-12 rounded-xl" />
                 ))}
               </div>
             ) : (
@@ -284,34 +325,74 @@ export function CalendarPage() {
                     month === today.getMonth() &&
                     year === today.getFullYear()
                   const isSelected = day === selectedDay
-                  const hasEvents = (calendarEvents ?? []).some(
+                  const dayEvents = filteredCalendarEvents.filter(
                     (e) => e.startAt.slice(0, 10) === iso,
                   )
+                  const visibleEvents = dayEvents.slice(0, 2)
+                  const extraCount = dayEvents.length - 2
 
                   return (
                     <button
                       key={i}
                       onClick={() => setSelectedDay(day)}
                       className={`
-                        relative h-10 rounded-xl text-sm font-medium transition-all
-                        ${isSelected ? 'ring-2 ring-offset-1' : ''}
+                        relative h-12 rounded-xl text-sm font-medium transition-all
                         ${isToday ? 'font-bold' : ''}
                         ${parentColor ? 'text-white' : 'text-slate-600 hover:bg-slate-50'}
                       `}
                       style={{
                         backgroundColor: parentColor ?? undefined,
-                        ...(isSelected ? { ringColor: parentColor ?? '#14b8a6' } : {}),
+                        border: isSelected
+                          ? '2px solid #66CCCC'
+                          : '2px solid transparent',
                       }}
                     >
-                      {day}
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        {day}
+                      </span>
                       {isToday && !parentColor && (
                         <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-teal-400" />
                       )}
-                      {hasEvents && (
-                        <span
-                          className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
-                          style={{ backgroundColor: parentColor ? 'rgba(255,255,255,0.8)' : '#6366f1' }}
-                        />
+                      {dayEvents.length > 0 && (
+                        <span className="absolute top-0.5 right-0.5 flex items-center gap-px">
+                          {visibleEvents.map((ev, idx) => {
+                            const Icon = EVENT_TYPE_ICONS[ev.type]
+                            return (
+                              <span
+                                key={idx}
+                                className="w-3.5 h-3.5 rounded-full flex items-center justify-center transition-transform hover:scale-105"
+                                style={{
+                                  backgroundColor: parentColor ? 'rgba(255,255,255,0.92)' : 'white',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+                                }}
+                              >
+                                <Icon
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    color: parentColor ?? '#6366f1',
+                                  }}
+                                />
+                              </span>
+                            )
+                          })}
+                          {extraCount > 0 && (
+                            <span
+                              className="h-3.5 rounded-full flex items-center justify-center transition-transform hover:scale-105 font-bold"
+                              style={{
+                                backgroundColor: parentColor ? 'rgba(255,255,255,0.92)' : 'white',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+                                color: parentColor ?? '#6366f1',
+                                fontSize: 8,
+                                minWidth: 14,
+                                paddingLeft: 2,
+                                paddingRight: 2,
+                              }}
+                            >
+                              +{extraCount}
+                            </span>
+                          )}
+                        </span>
                       )}
                     </button>
                   )
@@ -432,16 +513,54 @@ export function CalendarPage() {
                   )
                 })}
                 {selectedDayCalendarEvents.map((ev) => (
-                  <div key={ev.id} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-indigo-50 border border-indigo-100">
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0 mt-1 bg-indigo-400" />
-                    <div>
-                      <p className="text-sm font-medium text-indigo-800">{ev.title}</p>
+                  <div key={ev.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 group">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-indigo-400" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-indigo-800 truncate">{ev.title}</p>
                       <p className="text-[10px] text-indigo-400">
                         {ev.allDay
                           ? 'All day'
                           : `${ev.startAt.slice(11, 16)} – ${ev.endAt.slice(11, 16)}`}
                         {ev.visibility === 'PRIVATE' && ' · Private'}
                       </p>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button
+                        onClick={() => { setEditingEvent(ev); setAddEventOpen(true) }}
+                        className="p-1 rounded-lg hover:bg-indigo-100 text-indigo-400 hover:text-indigo-600 transition-colors"
+                        title="Edit event"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Delete with inline confirmation */}
+                      <div className="relative">
+                        {confirmDeleteId === ev.id ? (
+                          <div className="absolute right-0 bottom-full mb-1.5 flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl shadow-lg px-2.5 py-1.5 z-10 whitespace-nowrap">
+                            <span className="text-xs text-slate-600 font-medium">Delete?</span>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="text-xs px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors font-medium"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEvent(ev.id)}
+                              disabled={deleteEvent.isPending}
+                              className="text-xs px-2 py-0.5 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors font-medium disabled:opacity-60"
+                            >
+                              {deleteEvent.isPending ? '…' : 'Delete'}
+                            </button>
+                          </div>
+                        ) : null}
+                        <button
+                          onClick={() => setConfirmDeleteId(ev.id)}
+                          className="p-1 rounded-lg hover:bg-red-100 text-indigo-400 hover:text-red-500 transition-colors"
+                          title="Delete event"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -494,11 +613,12 @@ export function CalendarPage() {
       {familyId && children && (
         <AddEventModal
           open={addEventOpen}
-          onClose={() => setAddEventOpen(false)}
+          onClose={() => { setAddEventOpen(false); setEditingEvent(null) }}
           familyId={familyId}
           children={children}
           parents={parents}
           defaultDate={addEventDate}
+          editEvent={editingEvent ?? undefined}
         />
       )}
 

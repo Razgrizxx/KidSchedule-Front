@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Loader2, Users, Lock, Check } from 'lucide-react'
 import {
   Dialog,
@@ -13,9 +13,9 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useCreateEvent } from '@/hooks/useCalendar'
+import { useCreateEvent, useUpdateEvent } from '@/hooks/useCalendar'
 import { toast } from '@/hooks/use-toast'
-import type { Child, FamilyMember, EventType, EventVisibility, RepeatPattern } from '@/types/api'
+import type { Child, FamilyMember, EventType, EventVisibility, RepeatPattern, CalendarEvent } from '@/types/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -27,6 +27,8 @@ interface Props {
   parents: FamilyMember[]
   /** Pre-fill the start date (YYYY-MM-DD) when opened by clicking a day */
   defaultDate?: string
+  /** When provided, the modal acts as an editor for this event */
+  editEvent?: CalendarEvent
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -55,10 +57,10 @@ function todayStr() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function AddEventModal({ open, onClose, familyId, children, parents, defaultDate }: Props) {
+export function AddEventModal({ open, onClose, familyId, children, parents, defaultDate, editEvent }: Props) {
   const createEvent = useCreateEvent()
-
-  const baseDate = defaultDate ?? todayStr()
+  const updateEvent = useUpdateEvent()
+  const isEditing = !!editEvent
 
   const [selectedChildIds, setSelectedChildIds] = useState<string[]>([])
   const [type, setType] = useState<EventType>('CUSTODY_TIME')
@@ -66,12 +68,45 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
   const [title, setTitle] = useState('Custody Time')
   const [visibility, setVisibility] = useState<EventVisibility>('SHARED')
   const [allDay, setAllDay] = useState(false)
-  const [startDate, setStartDate] = useState(baseDate)
+  const [startDate, setStartDate] = useState(todayStr())
   const [startTime, setStartTime] = useState('09:00')
-  const [endDate, setEndDate] = useState(baseDate)
+  const [endDate, setEndDate] = useState(todayStr())
   const [endTime, setEndTime] = useState('17:00')
   const [repeat, setRepeat] = useState<RepeatPattern>('NONE')
   const [notes, setNotes] = useState('')
+
+  // Re-seed every time the modal opens
+  useEffect(() => {
+    if (!open) return
+    if (editEvent) {
+      setSelectedChildIds(editEvent.children.map((ec) => ec.child.id))
+      setAssignedToId(editEvent.assignedToId ?? '')
+      setType(editEvent.type)
+      setTitle(editEvent.title)
+      setVisibility(editEvent.visibility)
+      setAllDay(editEvent.allDay)
+      setStartDate(editEvent.startAt.slice(0, 10))
+      setStartTime(editEvent.startAt.slice(11, 16))
+      setEndDate(editEvent.endAt.slice(0, 10))
+      setEndTime(editEvent.endAt.slice(11, 16))
+      setRepeat(editEvent.repeat)
+      setNotes(editEvent.notes ?? '')
+    } else {
+      const date = defaultDate ?? todayStr()
+      setSelectedChildIds(children.length > 0 ? [children[0].id] : [])
+      setAssignedToId(parents[0]?.userId ?? '')
+      setType('CUSTODY_TIME')
+      setTitle('Custody Time')
+      setVisibility('SHARED')
+      setAllDay(false)
+      setStartDate(date)
+      setStartTime('09:00')
+      setEndDate(date)
+      setEndTime('17:00')
+      setRepeat('NONE')
+      setNotes('')
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleTypeChange(val: EventType) {
     setType(val)
@@ -93,23 +128,7 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
     )
   }
 
-  function resetForm() {
-    setSelectedChildIds([])
-    setType('CUSTODY_TIME')
-    setAssignedToId('')
-    setTitle('Custody Time')
-    setVisibility('SHARED')
-    setAllDay(false)
-    setStartDate(baseDate)
-    setStartTime('09:00')
-    setEndDate(baseDate)
-    setEndTime('17:00')
-    setRepeat('NONE')
-    setNotes('')
-  }
-
   function handleClose() {
-    resetForm()
     onClose()
   }
 
@@ -124,7 +143,7 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
     const endAt = allDay ? `${endDate}T23:59:59.000Z` : `${endDate}T${endTime}:00.000Z`
 
     try {
-      await createEvent.mutateAsync({
+      const payload = {
         familyId,
         title,
         type,
@@ -136,8 +155,14 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
         notes: notes || undefined,
         assignedToId: assignedToId || undefined,
         childIds: selectedChildIds,
-      })
-      toast({ title: 'Event added!', variant: 'success' })
+      }
+      if (isEditing && editEvent) {
+        await updateEvent.mutateAsync({ ...payload, eventId: editEvent.id })
+        toast({ title: 'Event updated!', variant: 'success' })
+      } else {
+        await createEvent.mutateAsync(payload)
+        toast({ title: 'Event added!', variant: 'success' })
+      }
       handleClose()
     } catch {
       toast({ title: 'Failed to add event', variant: 'error' })
@@ -148,8 +173,10 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Event</DialogTitle>
-          <DialogDescription>Add a new event to the family calendar.</DialogDescription>
+          <DialogTitle>{isEditing ? 'Edit Event' : 'Add Event'}</DialogTitle>
+          <DialogDescription>
+            {isEditing ? 'Update the details for this event.' : 'Add a new event to the family calendar.'}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -356,9 +383,11 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createEvent.isPending}>
-              {createEvent.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Add Event
+            <Button type="submit" disabled={createEvent.isPending || updateEvent.isPending}>
+              {(createEvent.isPending || updateEvent.isPending) && (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              )}
+              {isEditing ? 'Save Changes' : 'Add Event'}
             </Button>
           </DialogFooter>
         </form>

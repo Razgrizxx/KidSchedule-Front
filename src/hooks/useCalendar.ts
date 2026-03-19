@@ -82,3 +82,30 @@ export function useCreateEvent() {
     },
   })
 }
+
+interface UpdateEventDto extends Partial<Omit<CreateEventDto, 'familyId'>> {
+  familyId: string
+  eventId: string
+}
+
+export function useUpdateEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ familyId, eventId, ...body }: UpdateEventDto) =>
+      api.patch(`/families/${familyId}/events/${eventId}`, body).then((r) => r.data),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['events', variables.familyId] })
+    },
+  })
+}
+
+export function useDeleteEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ familyId, eventId }: { familyId: string; eventId: string }) =>
+      api.delete(`/families/${familyId}/events/${eventId}`).then((r) => r.data),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['events', variables.familyId] })
+    },
+  })
+}

@@ -99,6 +99,44 @@ export function useUpdateEvent() {
   })
 }
 
+export interface HolidayWithMeta {
+  id: string
+  date: string
+  name: string
+  country: 'AR' | 'US'
+  category: 'NATIONAL' | 'SCHOOL'
+  isTransitionDay: boolean
+}
+
+export function useHolidays(familyId?: string, year?: number, country?: string) {
+  return useQuery<HolidayWithMeta[]>({
+    queryKey: ['holidays', familyId, year, country],
+    queryFn: () =>
+      api
+        .get(`/families/${familyId}/events/holidays`, { params: { year, country } })
+        .then((r) => r.data),
+    enabled: !!familyId && !!year,
+  })
+}
+
+interface BulkImportDto {
+  familyId: string
+  events: { title: string; date: string; type: string }[]
+  childIds: string[]
+  visibility: string
+}
+
+export function useBulkImport() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ familyId, ...body }: BulkImportDto) =>
+      api.post(`/families/${familyId}/events/bulk`, body).then((r) => r.data),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['events', variables.familyId] })
+    },
+  })
+}
+
 export function useDeleteEvent() {
   const qc = useQueryClient()
   return useMutation({

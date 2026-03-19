@@ -5,7 +5,6 @@ import {
   Phone,
   Mail,
   Baby,
-  Loader2,
   Lock,
   AlertCircle,
   LogOut,

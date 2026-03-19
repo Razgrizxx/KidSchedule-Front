@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { toast } from '@/hooks/use-toast'
 import { post } from '@/lib/api'
+import api from '@/api'
 import { useAuthStore } from '@/store/authStore'
 import type { AuthUser } from '@/store/authStore'
 
@@ -37,9 +38,24 @@ interface AuthResponse {
   user: AuthUser
 }
 
+// ── Accept invitation helper ──────────────────────────────────────────────────
+
+async function tryAcceptInvitation(token: string, bearerToken: string): Promise<boolean> {
+  try {
+    await api.post(
+      `/families/invitations/${token}/accept`,
+      {},
+      { headers: { Authorization: `Bearer ${bearerToken}` } },
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
 // ── Sub-forms ─────────────────────────────────────────────────────────────────
 
-function LoginForm() {
+function LoginForm({ inviteToken }: { inviteToken: string | null }) {
   const [showPw, setShowPw] = useState(false)
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
@@ -54,7 +70,18 @@ function LoginForm() {
     try {
       const res = await post<AuthResponse>('/auth/login', data)
       setAuth(res.user, res.access_token)
-      toast({ title: 'Welcome back!', variant: 'success' })
+
+      if (inviteToken) {
+        const accepted = await tryAcceptInvitation(inviteToken, res.access_token)
+        if (accepted) {
+          toast({ title: 'Welcome! You joined the family.', variant: 'success' })
+        } else {
+          toast({ title: 'Welcome back!', variant: 'success' })
+        }
+      } else {
+        toast({ title: 'Welcome back!', variant: 'success' })
+      }
+
       navigate('/dashboard')
     } catch (err) {
       toast({
@@ -119,7 +146,7 @@ function LoginForm() {
   )
 }
 
-function RegisterForm() {
+function RegisterForm({ inviteToken }: { inviteToken: string | null }) {
   const [showPw, setShowPw] = useState(false)
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
@@ -134,7 +161,18 @@ function RegisterForm() {
     try {
       const res = await post<AuthResponse>('/auth/register', data)
       setAuth(res.user, res.access_token)
-      toast({ title: 'Account created!', variant: 'success' })
+
+      if (inviteToken) {
+        const accepted = await tryAcceptInvitation(inviteToken, res.access_token)
+        if (accepted) {
+          toast({ title: 'Account created! You joined the family.', variant: 'success' })
+        } else {
+          toast({ title: 'Account created!', variant: 'success' })
+        }
+      } else {
+        toast({ title: 'Account created!', variant: 'success' })
+      }
+
       navigate('/dashboard')
     } catch (err) {
       toast({
@@ -230,6 +268,10 @@ function RegisterForm() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function LoginPage() {
+  const [params] = useSearchParams()
+  const inviteToken = params.get('inviteToken')
+  const defaultTab = params.get('tab') === 'register' ? 'register' : 'login'
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-teal-50 to-white flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
@@ -242,14 +284,16 @@ export function LoginPage() {
             <span className="text-2xl font-bold text-slate-800">KidSchedule</span>
           </Link>
           <p className="text-slate-500 text-sm mt-1">
-            The family calendar that actually works.
+            {inviteToken
+              ? 'Sign in or create an account to accept your invitation.'
+              : 'The family calendar that actually works.'}
           </p>
         </div>
 
         {/* Card */}
         <Card className="rounded-2xl border-slate-100 shadow-sm">
           <CardContent className="pt-6 pb-8 px-8">
-            <Tabs defaultValue="login">
+            <Tabs defaultValue={defaultTab}>
               <TabsList className="w-full mb-6">
                 <TabsTrigger value="login" className="flex-1">
                   Log In
@@ -260,11 +304,11 @@ export function LoginPage() {
               </TabsList>
 
               <TabsContent value="login">
-                <LoginForm />
+                <LoginForm inviteToken={inviteToken} />
               </TabsContent>
 
               <TabsContent value="register">
-                <RegisterForm />
+                <RegisterForm inviteToken={inviteToken} />
               </TabsContent>
             </Tabs>
           </CardContent>

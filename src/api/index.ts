@@ -7,8 +7,12 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  const state = useAuthStore.getState()
+  if (state.token) {
+    config.headers.Authorization = `Bearer ${state.token}`
+  } else if (state.caregiverToken) {
+    config.headers['x-caregiver-token'] = state.caregiverToken
+  }
   return config
 })
 
@@ -16,7 +20,12 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      useAuthStore.getState().logout()
+      const state = useAuthStore.getState()
+      if (state.accessMode === 'parent') {
+        state.logout()
+      } else if (state.accessMode === 'caregiver') {
+        state.clearCaregiverAccess()
+      }
     }
     return Promise.reject(err)
   },

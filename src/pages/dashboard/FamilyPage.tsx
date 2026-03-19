@@ -203,9 +203,9 @@ export function FamilyPage() {
   async function handleInvite() {
     if (!inviteEmail) return
     try {
-      await inviteMember.mutateAsync({ email: inviteEmail })
+      await inviteMember.mutateAsync({ email: inviteEmail, sendEmail })
       toast({
-        title: 'Invitation sent!',
+        title: sendEmail ? `Invitation emailed to ${inviteEmail}` : 'Co-parent added',
         variant: 'success',
       })
       setInviteOpen(false)

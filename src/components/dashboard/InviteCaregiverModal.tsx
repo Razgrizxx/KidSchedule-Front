@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Lock, Share2, Lightbulb, Loader2 } from 'lucide-react'
+import { Lock, Share2, Lightbulb, Loader2, Mail } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAddCaregiver, type CreateCaregiverDto } from '@/hooks/useDashboard'
+import { Switch } from '@/components/ui/switch'
 import { toast } from '@/hooks/use-toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -109,11 +110,13 @@ export function InviteCaregiverModal({
   isShared,
 }: InviteCaregiverModalProps) {
   const [form, setForm] = useState<CreateCaregiverDto>(() => defaultForm(isShared))
+  const [sendEmail, setSendEmail] = useState(false)
   const addCaregiver = useAddCaregiver(familyId)
 
   function handleClose() {
     onOpenChange(false)
     setForm(defaultForm(isShared))
+    setSendEmail(false)
   }
 
   function togglePermission(key: Permission['key']) {
@@ -123,9 +126,14 @@ export function InviteCaregiverModal({
   async function handleSubmit() {
     if (!form.name.trim()) return
     try {
-      await addCaregiver.mutateAsync({ ...form, visibility: isShared ? 'SHARED' : 'PRIVATE' })
+      await addCaregiver.mutateAsync({
+        ...form,
+        visibility: isShared ? 'SHARED' : 'PRIVATE',
+        sendEmail: !!(form.email && sendEmail),
+      })
+      const emailSent = form.email && sendEmail
       toast({
-        title: form.email
+        title: emailSent
           ? `Invitation sent to ${form.email}`
           : `${form.name} added as caregiver`,
         variant: 'success',
@@ -194,7 +202,7 @@ export function InviteCaregiverModal({
 
           {/* Email */}
           <div className="space-y-1.5">
-            <Label className="text-xs">Email Address <span className="text-slate-400">(optional — to send invite link)</span></Label>
+            <Label className="text-xs">Email Address <span className="text-slate-400">(optional)</span></Label>
             <Input
               type="email"
               placeholder="caregiver@example.com"
@@ -202,6 +210,22 @@ export function InviteCaregiverModal({
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             />
           </div>
+
+          {/* Send email toggle — only relevant when email is filled */}
+          {form.email && (
+            <div className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-100">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Send invite email now</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {sendEmail ? 'A formal invitation will be emailed' : 'Save privately — share the link yourself'}
+                  </p>
+                </div>
+              </div>
+              <Switch checked={sendEmail} onCheckedChange={setSendEmail} />
+            </div>
+          )}
 
           {/* Permissions */}
           <div className="space-y-2">
@@ -294,7 +318,7 @@ export function InviteCaregiverModal({
             disabled={addCaregiver.isPending || !form.name.trim()}
           >
             {addCaregiver.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-            {form.email ? 'Send Invitation' : 'Add Caregiver'}
+            {form.email && sendEmail ? 'Send Invitation' : 'Add Caregiver'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -19,12 +19,15 @@ import { TeamsPage } from './pages/TeamsPage'
 import { FamiliesPage } from './pages/FamiliesPage'
 import { BlogListPage } from './pages/BlogListPage'
 import { BlogDetailPage } from './pages/BlogDetailPage'
+import { JoinPage } from './pages/JoinPage'
+import { CaregiverAccessPage } from './pages/CaregiverAccessPage'
 import { Toaster } from './components/ui/toaster'
 import { useAuthStore } from './store/authStore'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token)
-  if (!token) return <Navigate to="/login" replace />
+  const accessMode = useAuthStore((s) => s.accessMode)
+  if (!token && accessMode !== 'caregiver') return <Navigate to="/login" replace />
   return <>{children}</>
 }
 
@@ -61,6 +64,8 @@ function App() {
           <Route path="/families" element={<FamiliesPage />} />
           <Route path="/blog" element={<BlogListPage />} />
           <Route path="/blog/:slug" element={<BlogDetailPage />} />
+          <Route path="/join" element={<JoinPage />} />
+          <Route path="/caregiver-access" element={<CaregiverAccessPage />} />
         </Routes>
         <Toaster />
       </div>

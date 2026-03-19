@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Calendar, Menu, X, ShieldCheck } from "lucide-react";
+import { Calendar, Menu, X, ShieldCheck, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuthStore } from "@/store/authStore";
 
 // ─── SmartNavLink ─────────────────────────────────────────────────────────────
 // On "/": smooth-scrolls to #id.
@@ -43,6 +44,9 @@ function SmartNavLink({
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const accessMode = useAuthStore((s) => s.accessMode);
+  const caregiverData = useAuthStore((s) => s.caregiverData);
+  const navigate = useNavigate();
 
   const linkClass =
     "text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors";
@@ -106,14 +110,27 @@ export function Navbar() {
 
           {/* Desktop CTAs */}
           <div className="hidden md:flex items-center gap-3">
-            <Link to="/login">
-              <Button variant="ghost" size="sm">
-                Log In
+            {accessMode === 'caregiver' ? (
+              <Button
+                size="sm"
+                className="gap-1.5 bg-purple-500 hover:bg-purple-600 text-white"
+                onClick={() => void navigate('/dashboard')}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                {caregiverData?.children[0]
+                  ? `Back to ${caregiverData.children[0].firstName}'s Schedule`
+                  : 'Back to Schedule'}
               </Button>
-            </Link>
-            <Link to="/login">
-              <Button size="sm">Get Started</Button>
-            </Link>
+            ) : (
+              <>
+                <Link to="/login">
+                  <Button variant="ghost" size="sm">Log In</Button>
+                </Link>
+                <Link to="/login">
+                  <Button size="sm">Get Started</Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}

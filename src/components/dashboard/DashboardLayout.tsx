@@ -4,11 +4,18 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { useAuthStore } from '@/store/authStore'
+import { CaregiverDashboardView } from '@/pages/dashboard/CaregiverDashboardView'
 
 export function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
   const appearance = useAuthStore((s) => s.appearance)
+  const accessMode = useAuthStore((s) => s.accessMode)
+
+  // Caregiver mode: bypass the full parent layout entirely
+  if (accessMode === 'caregiver') {
+    return <CaregiverDashboardView />
+  }
 
   return (
     <div

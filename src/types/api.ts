@@ -182,6 +182,51 @@ export interface CalendarEvent {
   createdAt: string
 }
 
+export type MediationStatus = 'ACTIVE' | 'RESOLVED' | 'ESCALATED'
+export type ProposalStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED'
+
+export interface MediationMessage {
+  id: string
+  sessionId: string
+  senderId?: string
+  content: string
+  isAI: boolean
+  createdAt: string
+  sender?: { id: string; firstName: string; lastName: string }
+}
+
+export interface ResolutionProposal {
+  id: string
+  sessionId: string
+  proposedBy: string
+  acceptedBy?: string
+  summary: string
+  status: ProposalStatus
+  createdAt: string
+  proposer?: { id: string; firstName: string; lastName: string }
+  accepter?: { id: string; firstName: string; lastName: string }
+}
+
+export interface MediationSession {
+  id: string
+  familyId: string
+  topic: string
+  status: MediationStatus
+  createdAt: string
+  updatedAt: string
+  messages?: MediationMessage[]
+  proposals?: ResolutionProposal[]
+  _count?: { messages: number; proposals: number }
+}
+
+export interface MediationStats {
+  total: number
+  active: number
+  resolved: number
+  escalated: number
+  resolutionRate: number
+}
+
 export type AppearanceTheme = 'FRIENDLY' | 'MODERN' | 'MINIMAL'
 export type TimeFormat = 'TWELVE_HOUR' | 'TWENTY_FOUR_HOUR'
 

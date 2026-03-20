@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CustodyDatePicker } from '@/components/calendar/CustodyDatePicker'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { useFamilies } from '@/hooks/useDashboard'
 import { useRequests, useCreateRequest, useRespondRequest } from '@/hooks/useRequests'
@@ -56,27 +57,35 @@ function NewRequestModal({
   const [requestedDateTo, setRequestedDateTo] = useState('')
   const [reason, setReason] = useState('')
   const [ownershipWarning, setOwnershipWarning] = useState(false)
+  const [requestedWarning, setRequestedWarning] = useState(false)
 
   const originalMonth = originalDate ? originalDate.slice(0, 7) : undefined
-  const { data: custodyEvents } = useCustodyEvents(
-    familyId,
-    originalMonth,
-  )
+  const requestedMonth = requestedDate ? requestedDate.slice(0, 7) : undefined
 
-  // Check ownership when originalDate changes (swap mode only)
+  const { data: custodyEventsOrig } = useCustodyEvents(familyId, originalMonth)
+  const { data: custodyEventsReq } = useCustodyEvents(familyId, requestedMonth)
+
+  // Warn if "giving up" date doesn't belong to the current user
   useEffect(() => {
-    if (mode !== 'SWAP' || !originalDate || !custodyEvents || !user) {
+    if (mode !== 'SWAP' || !originalDate || !custodyEventsOrig || !user) {
       setOwnershipWarning(false)
       return
     }
-    const dateISO = new Date(originalDate + 'T12:00:00').toISOString().slice(0, 10)
-    const event = custodyEvents.find((e) => {
-      const d = new Date(e.date).toISOString().slice(0, 10)
-      return d === dateISO
-    })
-    // Warn if that day does NOT belong to the current user
+    const iso = originalDate.slice(0, 10)
+    const event = custodyEventsOrig.find((e) => e.date.slice(0, 10) === iso)
     setOwnershipWarning(!!event && event.custodianId !== user.id)
-  }, [mode, originalDate, custodyEvents, user])
+  }, [mode, originalDate, custodyEventsOrig, user])
+
+  // Warn if "requesting" date already belongs to the current user
+  useEffect(() => {
+    if (mode !== 'SWAP' || !requestedDate || !custodyEventsReq || !user) {
+      setRequestedWarning(false)
+      return
+    }
+    const iso = requestedDate.slice(0, 10)
+    const event = custodyEventsReq.find((e) => e.date.slice(0, 10) === iso)
+    setRequestedWarning(!!event && event.custodianId === user.id)
+  }, [mode, requestedDate, custodyEventsReq, user])
 
   const create = useCreateRequest(familyId)
 
@@ -111,7 +120,7 @@ function NewRequestModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose() }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={mode === 'SINGLE' ? 'sm:max-w-sm' : 'sm:max-w-2xl'}>
         <DialogHeader>
           <DialogTitle>New Schedule Request</DialogTitle>
         </DialogHeader>
@@ -143,58 +152,68 @@ function NewRequestModal({
             </div>
           </div>
 
-          {/* Swap: date giving up */}
+          {/* Single: one picker */}
+          {mode === 'SINGLE' && (
+            <CustodyDatePicker
+              familyId={familyId}
+              value={requestedDate}
+              onChange={setRequestedDate}
+              label="Date I Want"
+            />
+          )}
+
+          {/* Swap: two pickers side by side */}
           {mode === 'SWAP' && (
-            <div className="space-y-1.5">
-              <Label>Date I&apos;m Giving Up</Label>
-              <Input
-                type="date"
-                value={originalDate}
-                onChange={(e) => setOriginalDate(e.target.value)}
-              />
+            <>
+              <div className="grid grid-cols-2 gap-3 items-start">
+                <CustodyDatePicker
+                  familyId={familyId}
+                  value={originalDate}
+                  onChange={setOriginalDate}
+                  label="Date I'm Giving Up"
+                />
+                <CustodyDatePicker
+                  familyId={familyId}
+                  value={requestedDate}
+                  onChange={setRequestedDate}
+                  label="Date I Want in Return"
+                />
+              </div>
               {ownershipWarning && (
                 <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
                   <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-700">
-                    This day appears to belong to your co-parent. Are you sure you want to give it up?
+                    The day you&apos;re giving up appears to belong to your co-parent. Are you sure?
                   </p>
                 </div>
               )}
-            </div>
+              {requestedWarning && (
+                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700">
+                    The day you&apos;re requesting already belongs to you according to the schedule.
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
-          {/* Single / Swap: one date */}
-          {mode !== 'RANGE' && (
-            <div className="space-y-1.5">
-              <Label>{mode === 'SWAP' ? 'Date I Want in Return' : 'Date I Want'}</Label>
-              <Input
-                type="date"
-                value={requestedDate}
-                onChange={(e) => setRequestedDate(e.target.value)}
-              />
-            </div>
-          )}
-
-          {/* Range: from + to */}
+          {/* Range: two pickers side by side */}
           {mode === 'RANGE' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>From</Label>
-                <Input
-                  type="date"
-                  value={requestedDate}
-                  onChange={(e) => setRequestedDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>To</Label>
-                <Input
-                  type="date"
-                  value={requestedDateTo}
-                  min={requestedDate || undefined}
-                  onChange={(e) => setRequestedDateTo(e.target.value)}
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-3 items-start">
+              <CustodyDatePicker
+                familyId={familyId}
+                value={requestedDate}
+                onChange={setRequestedDate}
+                label="From"
+              />
+              <CustodyDatePicker
+                familyId={familyId}
+                value={requestedDateTo}
+                onChange={setRequestedDateTo}
+                label="To"
+                minDate={requestedDate || undefined}
+              />
             </div>
           )}
 

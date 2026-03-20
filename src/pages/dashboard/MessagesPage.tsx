@@ -14,6 +14,7 @@ import {
   useMarkMessagesRead,
   useVerifyChain,
 } from '@/hooks/useMessages'
+import { useChatSocket, useTypingIndicator } from '@/hooks/useChatSocket'
 import { useSendPhoneCode, useVerifyPhone } from '@/hooks/useSettings'
 import { toast } from '@/hooks/use-toast'
 import type { Message } from '@/types/api'
@@ -349,6 +350,10 @@ export function MessagesPage() {
   const markRead = useMarkMessagesRead(familyId ?? '')
   const { data: chain } = useVerifyChain(familyId)
 
+  // Real-time socket: keeps messages cache fresh + typing indicator
+  useChatSocket(familyId)
+  const { typingUserId, sendTyping, sendStopTyping } = useTypingIndicator(familyId)
+
   const [text, setText] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -372,6 +377,7 @@ export function MessagesPage() {
     if (!text.trim() || !familyId) return
     const content = text.trim()
     setText('')
+    sendStopTyping()
     try {
       await sendMessage.mutateAsync(content)
     } catch {
@@ -492,12 +498,28 @@ export function MessagesPage() {
           )}
         </ScrollArea>
 
+        {/* Typing indicator */}
+        {typingUserId && typingUserId !== user?.id && (
+          <div className="px-4 pb-1 flex items-center gap-1.5">
+            <span className="flex gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce"
+                  style={{ animationDelay: `${i * 150}ms` }}
+                />
+              ))}
+            </span>
+            <span className="text-[11px] text-slate-400">Co-parent is typing…</span>
+          </div>
+        )}
+
         {/* Input */}
         <div className="border-t border-slate-100 p-3 shrink-0">
           <div className="flex items-center gap-2">
             <Input
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => { setText(e.target.value); sendTyping() }}
               onKeyDown={handleKeyDown}
               placeholder="Type a message… (Enter to send)"
               disabled={!familyId || sendMessage.isPending}

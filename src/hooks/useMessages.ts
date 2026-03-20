@@ -19,7 +19,7 @@ export function useMessages(familyId?: string) {
     queryFn: () =>
       api.get(`/families/${familyId}/messages`).then((r) => r.data),
     enabled: !!familyId,
-    refetchInterval: 5000,
+    // No polling — real-time updates handled by useChatSocket
   })
 }
 

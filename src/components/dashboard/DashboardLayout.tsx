@@ -5,12 +5,18 @@ import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { useAuthStore } from '@/store/authStore'
 import { CaregiverDashboardView } from '@/pages/dashboard/CaregiverDashboardView'
+import { useFamilies } from '@/hooks/useDashboard'
+import { useAppSocket } from '@/hooks/useAppSocket'
 
 export function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
   const appearance = useAuthStore((s) => s.appearance)
   const accessMode = useAuthStore((s) => s.accessMode)
+
+  // Global WebSocket: live notifications, mediation AI push, request updates
+  const { data: families } = useFamilies()
+  useAppSocket(families?.[0]?.id)
 
   // Caregiver mode: bypass the full parent layout entirely
   if (accessMode === 'caregiver') {

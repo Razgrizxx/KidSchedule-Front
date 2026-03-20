@@ -24,7 +24,7 @@ export function useMediationSession(familyId?: string, sessionId?: string) {
     queryFn: () =>
       api.get(`/families/${familyId}/mediation/${sessionId}`).then((r) => r.data),
     enabled: !!familyId && !!sessionId,
-    refetchInterval: 5000,
+    // No polling — real-time updates handled by useAppSocket (new_mediation_message)
   })
 }
 

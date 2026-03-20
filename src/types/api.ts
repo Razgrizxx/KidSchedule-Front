@@ -113,15 +113,17 @@ export interface ChangeRequest {
   responderId?: string
   type: 'ONE_TIME' | 'PERMANENT'
   status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'COUNTER_PROPOSED'
-  originalDate: string
+  originalDate?: string
   requestedDate: string
+  requestedDateTo?: string
   childId?: string
   reason?: string
   counterDate?: string
   counterReason?: string
   resolvedAt?: string
   createdAt: string
-  requester?: AuthUser
+  requester?: { id: string; firstName: string; lastName: string }
+  responder?: { id: string; firstName: string; lastName: string }
 }
 
 export interface Moment {

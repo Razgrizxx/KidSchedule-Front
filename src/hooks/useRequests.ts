@@ -5,8 +5,27 @@ import type { ChangeRequest } from '@/types/api'
 export function useRequests(familyId?: string) {
   return useQuery<ChangeRequest[]>({
     queryKey: ['requests', familyId],
-    queryFn: () => api.get(`/requests/${familyId}`).then((r) => r.data),
+    queryFn: () =>
+      api.get(`/families/${familyId}/requests`).then((r) => r.data),
     enabled: !!familyId,
+  })
+}
+
+export function useCreateRequest(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (dto: {
+      type: 'ONE_TIME' | 'PERMANENT'
+      originalDate?: string
+      requestedDate: string
+      requestedDateTo?: string
+      childId?: string
+      reason?: string
+    }) =>
+      api.post(`/families/${familyId}/requests`, dto).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['requests', familyId] })
+    },
   })
 }
 
@@ -16,14 +35,26 @@ export function useRespondRequest(familyId: string) {
     mutationFn: ({
       id,
       action,
+      counterDate,
+      counterReason,
     }: {
       id: string
-      action: 'accept' | 'decline'
+      action: 'ACCEPTED' | 'DECLINED' | 'COUNTER_PROPOSED'
       counterDate?: string
       counterReason?: string
-    }) => api.patch(`/requests/${id}/${action}`).then((r) => r.data),
+    }) =>
+      api
+        .patch(`/families/${familyId}/requests/${id}/respond`, {
+          action,
+          counterDate,
+          counterReason,
+        })
+        .then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['requests', familyId] })
+      // Calendar re-validation so approved swaps show immediately
+      void qc.invalidateQueries({ queryKey: ['custody-events'] })
+      void qc.invalidateQueries({ queryKey: ['calendar-events'] })
     },
   })
 }

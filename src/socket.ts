@@ -6,7 +6,6 @@ let socket: Socket | null = null
 export function getSocket(): Socket {
   if (!socket) {
     const token = useAuthStore.getState().token
-    console.log('[socket] creating, token present:', !!token)
     socket = io('http://localhost:3000/chat', {
       auth: { token },
       autoConnect: true,
@@ -14,10 +13,6 @@ export function getSocket(): Socket {
       reconnectionDelay: 1000,
       reconnectionAttempts: 10,
     })
-    socket.on('connect', () => console.log('[socket] connected:', socket?.id))
-    socket.on('disconnect', (r) => console.log('[socket] disconnected:', r))
-    socket.on('connect_error', (e) => console.log('[socket] connect_error:', e.message))
-    socket.onAny((event, ...args) => console.log('[socket] event:', event, args))
   }
   return socket
 }

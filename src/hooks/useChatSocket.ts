@@ -31,7 +31,6 @@ export function useChatSocket(familyId: string | undefined) {
     }
 
     function onNewMessage(message: Message) {
-      console.log('[useChatSocket] new_message received:', message.id)
       // Optimistic update first for instant display
       qc.setQueryData<MessagesCache>(['messages', familyId], (old) => {
         if (!old) return { messages: [message], nextCursor: null }

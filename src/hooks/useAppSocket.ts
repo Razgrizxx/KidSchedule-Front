@@ -64,7 +64,6 @@ export function useAppSocket(familyId: string | undefined) {
 
     // ── Mediation message → toast when not on mediation page ────────────────
     function onNewMediationMessage({ sessionId, message }: { sessionId: string; message: MediationMessage }) {
-      console.log('[useAppSocket] new_mediation_message:', message.id)
       qc.setQueryData(
         ['mediation-session', familyId, sessionId],
         (old: { messages?: MediationMessage[] } | undefined) => {

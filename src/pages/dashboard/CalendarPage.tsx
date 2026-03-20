@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
-  ChevronLeft, ChevronRight, CalendarPlus, Loader2, DownloadCloud,
+  ChevronLeft, ChevronRight, CalendarPlus, Loader2, DownloadCloud, CalendarSync,
 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { useFamilies, useChildren } from '@/hooks/useDashboard'
 import { useSchedules, useCreateSchedule } from '@/hooks/useCalendar'
+import { useGoogleStatus, useGoogleAuthUrl, useExportCalendar } from '@/hooks/useSettings'
 import { toast } from '@/hooks/use-toast'
 import { AddEventModal } from '@/components/dashboard/AddEventModal'
 import { ImportEventsModal } from '@/components/dashboard/ImportEventsModal'
@@ -110,6 +111,27 @@ export function CalendarPage() {
   const { data: schedules } = useSchedules(familyId)
   const createSchedule = useCreateSchedule()
 
+  const { data: googleStatus } = useGoogleStatus()
+  const getGoogleAuthUrl = useGoogleAuthUrl()
+  const exportCalendar = useExportCalendar(familyId)
+
+  async function handleExport() {
+    if (!googleStatus?.connected) {
+      const url = await getGoogleAuthUrl.mutateAsync()
+      window.location.href = url
+      return
+    }
+    try {
+      const result = await exportCalendar.mutateAsync(false)
+      toast({
+        title: '¡Calendario sincronizado!',
+        description: `${result.synced + result.custodySynced} events exported. Check your Google Calendar.`,
+      })
+    } catch {
+      toast({ title: 'Export failed', description: 'Could not sync to Google Calendar.', variant: 'destructive' })
+    }
+  }
+
   // Select first child by default
   useEffect(() => {
     if (children && children.length > 0 && selectedChildId === null) {
@@ -173,6 +195,19 @@ export function CalendarPage() {
           <p className="text-sm text-slate-400">Custody schedule at a glance</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={exportCalendar.isPending || getGoogleAuthUrl.isPending}
+            className="gap-2"
+          >
+            {exportCalendar.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <CalendarSync className="w-4 h-4" />
+            )}
+            {exportCalendar.isPending ? 'Exporting…' : 'Google Calendar'}
+          </Button>
           <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
             <DownloadCloud className="w-4 h-4" />
             Import

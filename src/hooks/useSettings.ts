@@ -62,6 +62,18 @@ export function useGoogleSync(familyId?: string) {
   })
 }
 
+export function useExportCalendar(familyId?: string) {
+  return useMutation({
+    mutationFn: (cleanup: boolean) =>
+      api
+        .post<{ synced: number; custodySynced: number }>(
+          `/auth/google/export/${familyId}`,
+          { cleanup },
+        )
+        .then((r) => r.data),
+  })
+}
+
 export function useFamilySettings(familyId?: string) {
   return useQuery<FamilySettings>({
     queryKey: ['familySettings', familyId],

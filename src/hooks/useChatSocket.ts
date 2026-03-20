@@ -31,12 +31,15 @@ export function useChatSocket(familyId: string | undefined) {
     }
 
     function onNewMessage(message: Message) {
+      console.log('[useChatSocket] new_message received:', message.id)
+      // Optimistic update first for instant display
       qc.setQueryData<MessagesCache>(['messages', familyId], (old) => {
         if (!old) return { messages: [message], nextCursor: null }
-        // Deduplicate — may already be in cache from HTTP response
         if (old.messages.some((m) => m.id === message.id)) return old
         return { ...old, messages: [...old.messages, message] }
       })
+      // Then refetch to ensure consistency with DB
+      void qc.invalidateQueries({ queryKey: ['messages', familyId] })
     }
 
     socket.on('new_message', onNewMessage)

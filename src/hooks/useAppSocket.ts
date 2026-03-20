@@ -67,6 +67,7 @@ export function useAppSocket(familyId: string | undefined) {
     }
 
     function onNewMediationMessage({ sessionId, message }: { sessionId: string; message: MediationMessage }) {
+      console.log('[useAppSocket] new_mediation_message:', message.id)
       qc.setQueryData(
         ['mediation-session', familyId, sessionId],
         (old: { messages?: MediationMessage[] } | undefined) => {
@@ -75,6 +76,7 @@ export function useAppSocket(familyId: string | undefined) {
           return { ...old, messages: [...(old.messages ?? []), message] }
         },
       )
+      void qc.invalidateQueries({ queryKey: ['mediation-session', familyId, sessionId] })
     }
 
     socket.on('notification', onNotification)

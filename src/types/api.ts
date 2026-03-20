@@ -129,13 +129,13 @@ export interface Moment {
   familyId: string
   uploadedBy: string
   childId?: string
-  title?: string
-  description?: string
+  caption?: string
   mediaUrl: string
-  thumbnailUrl?: string
+  cloudinaryPublicId?: string
   takenAt?: string
   createdAt: string
-  uploader?: AuthUser
+  uploader?: { id: string; firstName: string; lastName: string }
+  child?: { id: string; firstName: string; color: string }
 }
 
 export interface Caregiver {

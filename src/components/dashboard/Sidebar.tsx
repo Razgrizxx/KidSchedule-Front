@@ -17,6 +17,7 @@ import {
   School,
   Trophy,
   ChevronRight,
+  Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -32,6 +33,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useMyOrganizations, useCreateOrg, useJoinOrg } from '@/hooks/useOrganizations'
+import { useSubscription, canUseFeature } from '@/hooks/useSubscription'
+import { ProBadge, UpgradeModal } from '@/components/FeatureGate'
 import { toast } from '@/hooks/use-toast'
 import type { OrgType } from '@/types/api'
 
@@ -183,8 +186,12 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
   const [orgModalOpen, setOrgModalOpen] = useState(false)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   const { data: orgs = [] } = useMyOrganizations()
+  const { data: sub } = useSubscription()
+  const plan = sub?.plan ?? 'FREE'
+  const canUseOrgs = canUseFeature(plan, 'organizations')
 
   function handleLogout() {
     logout()
@@ -232,19 +239,30 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         {/* My Groups section */}
         <div className="pt-3">
           <div className="flex items-center justify-between px-3 pb-1">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              My Groups
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                My Groups
+              </span>
+              {!canUseOrgs && <ProBadge plan="ESSENTIAL" />}
+            </div>
             <button
-              onClick={() => setOrgModalOpen(true)}
+              onClick={() => canUseOrgs ? setOrgModalOpen(true) : setUpgradeOpen(true)}
               className="p-0.5 rounded-md text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
-              title="Join or create a group"
+              title={canUseOrgs ? 'Join or create a group' : 'Upgrade to Essential to use groups'}
             >
-              <Plus className="w-3.5 h-3.5" />
+              {canUseOrgs ? <Plus className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
             </button>
           </div>
 
-          {orgs.length === 0 ? (
+          {!canUseOrgs ? (
+            <button
+              onClick={() => setUpgradeOpen(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              Available on Essential+
+            </button>
+          ) : orgs.length === 0 ? (
             <button
               onClick={() => setOrgModalOpen(true)}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all"
@@ -325,6 +343,12 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       </div>
 
       <OrgModal open={orgModalOpen} onClose={() => setOrgModalOpen(false)} />
+      <UpgradeModal
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        requiredPlan="ESSENTIAL"
+        featureLabel="Groups & Organizations"
+      />
     </div>
   )
 

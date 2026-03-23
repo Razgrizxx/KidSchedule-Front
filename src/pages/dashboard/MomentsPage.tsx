@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useAuthStore } from '@/store/authStore'
 import { useFamilies } from '@/hooks/useDashboard'
 import { useMoments, useCreateMoment, useDeleteMoment, cloudinaryOptimized } from '@/hooks/useMoments'
+import { useSubscription, canUseFeature, FREE_MOMENTS_LIMIT } from '@/hooks/useSubscription'
+import { UpgradeModal } from '@/components/FeatureGate'
 import { toast } from '@/hooks/use-toast'
 import type { Moment } from '@/types/api'
 
@@ -233,6 +235,18 @@ export function MomentsPage() {
   const { data: moments, isLoading } = useMoments(familyId)
   const deleteMoment = useDeleteMoment(familyId ?? '')
   const [modalOpen, setModalOpen] = useState(false)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+
+  const { data: sub } = useSubscription()
+  const plan = sub?.plan ?? 'FREE'
+  const hasUnlimitedMoments = canUseFeature(plan, 'moments_unlimited')
+  const momentCount = moments?.length ?? 0
+  const atLimit = !hasUnlimitedMoments && momentCount >= FREE_MOMENTS_LIMIT
+
+  function handleAddMoment() {
+    if (atLimit) { setUpgradeOpen(true); return }
+    setModalOpen(true)
+  }
 
   return (
     <div className="max-w-xl space-y-6">
@@ -241,11 +255,39 @@ export function MomentsPage() {
           <h2 className="text-xl font-bold text-slate-800">Moments</h2>
           <p className="text-sm text-slate-400">Family memories, shared securely</p>
         </div>
-        <Button onClick={() => setModalOpen(true)} className="gap-2">
+        <Button onClick={handleAddMoment} className="gap-2">
           <Plus className="w-4 h-4" />
           Add Moment
         </Button>
       </div>
+
+      {/* Free plan limit banner */}
+      {!hasUnlimitedMoments && (
+        <div className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm ${
+          atLimit
+            ? 'bg-amber-50 border-amber-200 text-amber-800'
+            : 'bg-slate-50 border-slate-200 text-slate-600'
+        }`}>
+          <span>
+            {atLimit
+              ? `Photo limit reached (${FREE_MOMENTS_LIMIT}/${FREE_MOMENTS_LIMIT}). Upgrade to upload more.`
+              : `${momentCount}/${FREE_MOMENTS_LIMIT} photos used on Free plan`}
+          </span>
+          <button
+            onClick={() => setUpgradeOpen(true)}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 ml-3 shrink-0"
+          >
+            Upgrade →
+          </button>
+        </div>
+      )}
+
+      <UpgradeModal
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        requiredPlan="PLUS"
+        featureLabel="Unlimited moments"
+      />
 
       {isLoading ? (
         <div className="space-y-4">

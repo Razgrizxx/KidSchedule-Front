@@ -6,10 +6,40 @@ export type BillingInterval = 'MONTHLY' | 'ANNUAL'
 
 export interface Subscription {
   plan: PlanType
+  ownPlan: PlanType
+  inheritedFromFamily: boolean
   billingInterval: BillingInterval
   currentPeriodEnd: string | null
   cancelAtPeriodEnd: boolean
 }
+
+// Which plan is needed per feature — mirrors backend FEATURE_PLAN
+export const FEATURE_PLAN: Record<string, PlanType> = {
+  multi_child:         'PLUS',
+  ai_mediation:        'PLUS',
+  ai_calendar_import:  'PLUS',
+  google_calendar:     'PLUS',
+  caregiver_portal:    'ESSENTIAL',
+  organizations:       'ESSENTIAL',
+  change_requests:     'ESSENTIAL',
+  moments_unlimited:   'PLUS',
+}
+
+const PLAN_ORDER: Record<PlanType, number> = {
+  FREE: 0, ESSENTIAL: 1, PLUS: 2, COMPLETE: 3,
+}
+
+export function canUsePlan(userPlan: PlanType, required: PlanType): boolean {
+  return PLAN_ORDER[userPlan] >= PLAN_ORDER[required]
+}
+
+export function canUseFeature(userPlan: PlanType, feature: string): boolean {
+  const required = FEATURE_PLAN[feature]
+  if (!required) return true
+  return canUsePlan(userPlan, required)
+}
+
+export const FREE_MOMENTS_LIMIT = 5
 
 export function useSubscription() {
   return useQuery<Subscription>({

@@ -1,7 +1,9 @@
-import { useLocation } from 'react-router-dom'
-import { Menu, Bell } from 'lucide-react'
+import { useLocation, Link } from 'react-router-dom'
+import { Menu, Bell, Crown, Zap } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuthStore } from '@/store/authStore'
+import { useSubscription, type PlanType } from '@/hooks/useSubscription'
+import { cn } from '@/lib/utils'
 
 const PAGE_LABELS: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -18,9 +20,49 @@ interface TopBarProps {
   onMenuClick: () => void
 }
 
+function PlanBadge({ plan }: { plan: PlanType }) {
+  if (plan === 'FREE') {
+    return (
+      <Link to="/pricing" className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
+        FREE
+      </Link>
+    )
+  }
+  if (plan === 'ESSENTIAL') {
+    return (
+      <Link to="/pricing" className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 transition-colors">
+        ESSENTIAL
+      </Link>
+    )
+  }
+  if (plan === 'PLUS') {
+    return (
+      <Link
+        to="/pricing"
+        className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm hover:shadow-md transition-shadow"
+      >
+        <Zap className="w-2.5 h-2.5" />
+        PLUS
+      </Link>
+    )
+  }
+  // COMPLETE
+  return (
+    <Link
+      to="/pricing"
+      className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm hover:shadow-md transition-shadow"
+    >
+      <Crown className="w-2.5 h-2.5" />
+      COMPLETE
+    </Link>
+  )
+}
+
 export function TopBar({ onMenuClick }: TopBarProps) {
   const location = useLocation()
   const user = useAuthStore((s) => s.user)
+  const { data: subscription } = useSubscription()
+  const plan: PlanType = subscription?.plan ?? 'FREE'
 
   const pageLabel = PAGE_LABELS[location.pathname] ?? 'Dashboard'
   const initials = user
@@ -56,9 +98,12 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         {/* User avatar */}
         <div className="flex items-center gap-2 pl-2">
           <div className="hidden sm:block text-right">
-            <p className="text-sm font-medium text-slate-800 leading-none">
-              {user ? `${user.firstName} ${user.lastName}` : 'User'}
-            </p>
+            <div className="flex items-center justify-end gap-1.5">
+              <p className="text-sm font-medium text-slate-800 leading-none">
+                {user ? `${user.firstName} ${user.lastName}` : 'User'}
+              </p>
+              <PlanBadge plan={plan} />
+            </div>
             <p className="text-xs text-slate-400 mt-0.5">{user?.email}</p>
           </div>
           <Avatar className="h-8 w-8">

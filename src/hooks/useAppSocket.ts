@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { getSocket, disconnectSocket } from '@/socket'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/hooks/use-toast'
-import type { MediationMessage, ResolutionProposal } from '@/types/api'
+import type { MediationMessage, Message, ResolutionProposal } from '@/types/api'
 
 interface Notification {
   type: string
@@ -52,8 +52,16 @@ export function useAppSocket(familyId: string | undefined) {
     const onMediation = pathname.includes('/mediation')
     const onMessages = pathname.includes('/messages')
 
-    // ── Regular chat message → toast when not on messages page ──────────────
-    function onNewMessage(message: { content: string; sender?: { firstName: string } }) {
+    // ── Regular chat message → always update cache, toast when not on messages page ──
+    function onNewMessage(message: Message) {
+      qc.setQueryData<{ messages: Message[]; nextCursor: string | null }>(
+        ['messages', familyId],
+        (old) => {
+          if (!old) return { messages: [message], nextCursor: null }
+          if (old.messages.some((m) => m.id === message.id)) return old
+          return { ...old, messages: [...old.messages, message] }
+        },
+      )
       if (!onMessages) {
         toast({
           title: `New message from ${message.sender?.firstName ?? 'Co-parent'}`,

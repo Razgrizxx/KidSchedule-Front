@@ -29,9 +29,14 @@ export function useSendMessage(familyId: string) {
     mutationFn: (content: string) =>
       api
         .post(`/families/${familyId}/messages`, { content })
-        .then((r) => r.data),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['messages', familyId] })
+        .then((r) => r.data as Message),
+    onSuccess: (message: Message) => {
+      // Add message to cache immediately (socket event may also fire — dedup handles it)
+      qc.setQueryData<MessagesResponse>(['messages', familyId], (old) => {
+        if (!old) return { messages: [message], nextCursor: null }
+        if (old.messages.some((m) => m.id === message.id)) return old
+        return { ...old, messages: [...old.messages, message] }
+      })
     },
   })
 }

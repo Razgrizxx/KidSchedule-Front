@@ -2,13 +2,13 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import api from '@/api'
 
 export type PlanType = 'FREE' | 'ESSENTIAL' | 'PLUS' | 'COMPLETE'
-export type BillingInterval = 'MONTHLY' | 'ANNUAL'
+export type BillingType = 'INDIVIDUAL' | 'FAMILY'
 
 export interface Subscription {
   plan: PlanType
   ownPlan: PlanType
   inheritedFromFamily: boolean
-  billingInterval: BillingInterval
+  billingType: BillingType
   currentPeriodEnd: string | null
   cancelAtPeriodEnd: boolean
 }

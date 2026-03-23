@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Globe, Calendar, Bell, Paintbrush, Check, Link2, Link2Off, RefreshCw, Loader2 } from 'lucide-react'
+import { useSearchParams, Link } from 'react-router-dom'
+import { Globe, Calendar, Bell, Paintbrush, Check, Link2, Link2Off, RefreshCw, Loader2, CreditCard, Crown, Zap, Star, ExternalLink, Lock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { useFamilies } from '@/hooks/useDashboard'
 import {
   useFamilySettings,
@@ -17,6 +19,9 @@ import {
   useGoogleDisconnect,
   useGoogleSync,
 } from '@/hooks/useSettings'
+import { useSubscription, useCreatePortal, type PlanType } from '@/hooks/useSubscription'
+import { useQueryClient } from '@tanstack/react-query'
+import { UpgradeModal } from '@/components/FeatureGate'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/hooks/use-toast'
 import type { AppearanceTheme, TimeFormat } from '@/types/api'
@@ -159,6 +164,217 @@ function CardSkeleton({ rows = 3 }: { rows?: number }) {
   )
 }
 
+// ─── Plan metadata ────────────────────────────────────────────────────────────
+
+const PLAN_META: Record<PlanType, {
+  label: string
+  icon: React.ReactNode
+  gradient: string
+  textColor: string
+  badgeClass: string
+  perks: string[]
+}> = {
+  FREE: {
+    label: 'Free',
+    icon: <Star className="w-4 h-4" />,
+    gradient: 'from-slate-100 to-slate-200',
+    textColor: 'text-slate-600',
+    badgeClass: 'bg-slate-100 text-slate-600',
+    perks: ['1 child profile', 'Basic calendar', 'Secure messaging', 'Up to 5 moments'],
+  },
+  ESSENTIAL: {
+    label: 'Essential',
+    icon: <Star className="w-4 h-4" />,
+    gradient: 'from-teal-400 to-teal-600',
+    textColor: 'text-teal-600',
+    badgeClass: 'bg-teal-100 text-teal-700',
+    perks: ['1 child profile', 'Groups & organizations', 'Change requests', 'Email notifications'],
+  },
+  PLUS: {
+    label: 'Plus',
+    icon: <Zap className="w-4 h-4" />,
+    gradient: 'from-blue-500 to-indigo-600',
+    textColor: 'text-blue-600',
+    badgeClass: 'bg-blue-100 text-blue-700',
+    perks: ['Up to 4 child profiles', 'AI Mediation', 'AI Calendar import', 'Google Calendar sync', 'Unlimited moments'],
+  },
+  COMPLETE: {
+    label: 'Complete',
+    icon: <Crown className="w-4 h-4" />,
+    gradient: 'from-purple-500 to-pink-600',
+    textColor: 'text-purple-600',
+    badgeClass: 'bg-purple-100 text-purple-700',
+    perks: ['Unlimited child profiles', 'Everything in Plus', 'Priority support', 'Advanced analytics'],
+  },
+}
+
+// ─── Subscription card ────────────────────────────────────────────────────────
+
+function SubscriptionCard({ justPurchased }: { justPurchased: boolean }) {
+  const { data: sub, isLoading } = useSubscription()
+  const portal = useCreatePortal()
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const qc = useQueryClient()
+
+  // After a successful checkout, poll until the plan upgrades (webhook may take a few seconds)
+  useEffect(() => {
+    if (!justPurchased) return
+    if (sub && sub.plan !== 'FREE') return // already upgraded
+
+    const interval = setInterval(() => {
+      void qc.invalidateQueries({ queryKey: ['subscription'] })
+    }, 2000)
+
+    const timeout = setTimeout(() => clearInterval(interval), 30_000) // give up after 30s
+
+    return () => { clearInterval(interval); clearTimeout(timeout) }
+  }, [justPurchased, sub?.plan, qc])
+
+  const plan = sub?.plan ?? 'FREE'
+  const meta = PLAN_META[plan]
+  const isPaid = plan !== 'FREE'
+  const activating = justPurchased && !isPaid
+  const periodEnd = sub?.currentPeriodEnd
+    ? new Date(sub.currentPeriodEnd).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+    : null
+
+  async function handleManageBilling() {
+    try {
+      await portal.mutateAsync()
+    } catch {
+      toast({ title: 'Could not open billing portal', variant: 'error' })
+    }
+  }
+
+  return (
+    <>
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-0 p-0">
+          {/* Gradient banner */}
+          <div className={`bg-gradient-to-r ${meta.gradient} px-6 py-5`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white">
+                  {meta.icon}
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-white/70 uppercase tracking-wider">Current Plan</p>
+                  <p className="text-xl font-bold text-white">{meta.label}</p>
+                </div>
+              </div>
+              {isPaid && (
+                <Badge className="bg-white/20 text-white border-0 backdrop-blur-sm text-xs">
+                  {sub?.billingType === 'FAMILY' ? 'Family' : 'Individual'}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="pt-5 space-y-4">
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-4 w-36" />
+            </div>
+          ) : (
+            <>
+              {/* Activating banner — shown right after checkout while webhook fires */}
+              {activating && (
+                <div className="flex items-center gap-3 p-3.5 rounded-xl bg-blue-50 border border-blue-200">
+                  <Loader2 className="w-4 h-4 text-blue-500 shrink-0 animate-spin" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">Activating your plan…</p>
+                    <p className="text-xs text-blue-600 mt-0.5">Payment received. Your plan will update in a few seconds.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* FREE upsell */}
+              {!isPaid && !activating && (
+                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+                  <Lock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">You're on the free plan</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Upgrade to unlock <strong>AI Mediation</strong>, <strong>Unlimited Moments</strong>, groups, and more.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Perks */}
+              <div className="grid grid-cols-2 gap-1.5">
+                {meta.perks.map((perk) => (
+                  <div key={perk} className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <Check className="w-3 h-3 text-teal-500 shrink-0" />
+                    {perk}
+                  </div>
+                ))}
+              </div>
+
+              {/* Inherited plan note */}
+              {sub?.inheritedFromFamily && (
+                <p className="text-xs text-slate-400 italic">
+                  Your plan is shared from a family member's subscription.
+                </p>
+              )}
+
+              {/* Period end */}
+              {periodEnd && (
+                <p className="text-xs text-slate-400">
+                  {sub?.cancelAtPeriodEnd ? 'Cancels' : 'Renews'} on {periodEnd}
+                </p>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 pt-1">
+                {isPaid ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    disabled={portal.isPending}
+                    onClick={() => void handleManageBilling()}
+                  >
+                    {portal.isPending
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <CreditCard className="w-3.5 h-3.5" />}
+                    Manage Billing
+                    <ExternalLink className="w-3 h-3 text-slate-400" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="gap-1.5 bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700 text-white border-0"
+                    onClick={() => setUpgradeOpen(true)}
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Upgrade Plan
+                  </Button>
+                )}
+                <Link
+                  to="/pricing"
+                  className="text-xs text-slate-400 hover:text-teal-600 transition-colors"
+                >
+                  View all plans →
+                </Link>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <UpgradeModal
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        requiredPlan="ESSENTIAL"
+        featureLabel="Premium features"
+      />
+    </>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function SettingsPage() {
@@ -166,16 +382,26 @@ export function SettingsPage() {
   const { data: families, isLoading: loadingFamilies } = useFamilies()
   const familyId = families?.[0]?.id
 
-  // Google Calendar OAuth redirect feedback
+  // URL param feedback (Google OAuth + Stripe checkout)
   const [searchParams, setSearchParams] = useSearchParams()
+  const [justPurchased, setJustPurchased] = useState(false)
+
   useEffect(() => {
     const google = searchParams.get('google')
+    const checkout = searchParams.get('checkout')
+
     if (google === 'connected') {
       toast({ title: 'Google Calendar connected!', variant: 'success' })
       setSearchParams((prev) => { prev.delete('google'); return prev })
     } else if (google === 'error') {
       toast({ title: 'Could not connect Google Calendar', variant: 'error' })
       setSearchParams((prev) => { prev.delete('google'); return prev })
+    }
+
+    if (checkout === 'success') {
+      setJustPurchased(true)
+      toast({ title: 'Payment successful!', description: 'Your plan is being activated…', variant: 'success' })
+      setSearchParams((prev) => { prev.delete('checkout'); return prev })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -264,6 +490,9 @@ export function SettingsPage() {
         <h2 className="text-xl font-bold text-slate-800">Settings</h2>
         <p className="text-sm text-slate-400">Changes save automatically</p>
       </div>
+
+      {/* ── Subscription & Billing ───────────────────────────────────────── */}
+      <SubscriptionCard justPurchased={justPurchased} />
 
       {/* ── Calendar Configuration ───────────────────────────────────────── */}
       <Card>

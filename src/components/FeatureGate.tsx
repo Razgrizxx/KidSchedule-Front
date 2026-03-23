@@ -25,30 +25,30 @@ const PLAN_HIGHLIGHTS: Record<PlanType, { label: string; color: string; icon: Re
     label: 'Essential',
     color: 'text-teal-600',
     icon: <Star className="w-4 h-4" />,
-    price: '$9.99/mo',
+    price: '$5.99/mo',
     perks: ['1 child profile', 'Caregiver portal', 'Groups & organizations', 'Change requests'],
   },
   PLUS: {
     label: 'Plus',
     color: 'text-blue-600',
     icon: <Zap className="w-4 h-4" />,
-    price: '$19.99/mo',
+    price: '$8.99/mo',
     perks: ['Up to 4 child profiles', 'AI Mediation', 'AI Calendar import', 'Google Calendar sync', 'Unlimited moments'],
   },
   COMPLETE: {
     label: 'Complete',
     color: 'text-purple-600',
     icon: <Crown className="w-4 h-4" />,
-    price: '$29.99/mo',
+    price: '$11.99/mo',
     perks: ['Unlimited child profiles', 'Everything in Plus', 'Priority support', 'Advanced analytics'],
   },
 }
 
 // Price IDs — must match what you set in .env
 const PRICE_IDS: Record<Exclude<PlanType, 'FREE'>, string> = {
-  ESSENTIAL: import.meta.env.VITE_STRIPE_PRICE_ESSENTIAL_MONTHLY ?? 'price_essential_monthly',
-  PLUS:      import.meta.env.VITE_STRIPE_PRICE_PLUS_MONTHLY      ?? 'price_plus_monthly',
-  COMPLETE:  import.meta.env.VITE_STRIPE_PRICE_COMPLETE_MONTHLY  ?? 'price_complete_monthly',
+  ESSENTIAL: import.meta.env.VITE_STRIPE_PRICE_ESSENTIAL_INDIVIDUAL ?? 'price_essential_individual',
+  PLUS:      import.meta.env.VITE_STRIPE_PRICE_PLUS_INDIVIDUAL      ?? 'price_plus_individual',
+  COMPLETE:  import.meta.env.VITE_STRIPE_PRICE_COMPLETE_INDIVIDUAL  ?? 'price_complete_individual',
 }
 
 export function UpgradeModal({

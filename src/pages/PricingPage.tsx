@@ -1,50 +1,47 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Crown, Zap, Star, ArrowLeft, Loader2 } from 'lucide-react'
+import { Check, Crown, Zap, Star, ArrowLeft, Loader2, Users, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import { useSubscription, useCreateCheckout } from '@/hooks/useSubscription'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 
-// ── Price IDs from Stripe — replace with real ones from your dashboard ────────
-// These are read from env in production; hardcoded here for dev wiring
+// ── Price IDs from Stripe ─────────────────────────────────────────────────────
 const PRICE_IDS = {
   ESSENTIAL: {
-    MONTHLY: import.meta.env.VITE_STRIPE_PRICE_ESSENTIAL_MONTHLY ?? 'price_essential_monthly',
-    ANNUAL:  import.meta.env.VITE_STRIPE_PRICE_ESSENTIAL_ANNUAL  ?? 'price_essential_annual',
+    INDIVIDUAL: import.meta.env.VITE_STRIPE_PRICE_ESSENTIAL_INDIVIDUAL ?? 'price_essential_individual',
+    FAMILY:     import.meta.env.VITE_STRIPE_PRICE_ESSENTIAL_FAMILY     ?? 'price_essential_family',
   },
   PLUS: {
-    MONTHLY: import.meta.env.VITE_STRIPE_PRICE_PLUS_MONTHLY ?? 'price_plus_monthly',
-    ANNUAL:  import.meta.env.VITE_STRIPE_PRICE_PLUS_ANNUAL  ?? 'price_plus_annual',
+    INDIVIDUAL: import.meta.env.VITE_STRIPE_PRICE_PLUS_INDIVIDUAL ?? 'price_plus_individual',
+    FAMILY:     import.meta.env.VITE_STRIPE_PRICE_PLUS_FAMILY     ?? 'price_plus_family',
   },
   COMPLETE: {
-    MONTHLY: import.meta.env.VITE_STRIPE_PRICE_COMPLETE_MONTHLY ?? 'price_complete_monthly',
-    ANNUAL:  import.meta.env.VITE_STRIPE_PRICE_COMPLETE_ANNUAL  ?? 'price_complete_annual',
+    INDIVIDUAL: import.meta.env.VITE_STRIPE_PRICE_COMPLETE_INDIVIDUAL ?? 'price_complete_individual',
+    FAMILY:     import.meta.env.VITE_STRIPE_PRICE_COMPLETE_FAMILY     ?? 'price_complete_family',
   },
 }
 
 interface Plan {
   key: 'ESSENTIAL' | 'PLUS' | 'COMPLETE'
   name: string
-  monthlyPrice: number
-  annualPrice: number
+  individualPrice: number
+  familyPrice: number
   description: string
   icon: React.ReactNode
   color: string
   badge?: string
-  features: string[]
   limit: string
+  features: string[]
 }
 
 const PLANS: Plan[] = [
   {
     key: 'ESSENTIAL',
     name: 'Essential',
-    monthlyPrice: 9.99,
-    annualPrice: 7.99,
+    individualPrice: 5.99,
+    familyPrice: 8.99,
     description: 'Perfect for single-parent coordination',
     icon: <Star className="w-5 h-5" />,
     color: 'text-slate-600',
@@ -55,14 +52,16 @@ const PLANS: Plan[] = [
       'Expense tracking',
       'PDF court-ready export',
       '1 child profile',
+      'Groups & organizations',
+      'Change requests',
       'Email notifications',
     ],
   },
   {
     key: 'PLUS',
     name: 'Plus',
-    monthlyPrice: 19.99,
-    annualPrice: 15.99,
+    individualPrice: 8.99,
+    familyPrice: 15.99,
     description: 'For families with multiple children',
     icon: <Zap className="w-5 h-5" />,
     color: 'text-blue-600',
@@ -73,16 +72,16 @@ const PLANS: Plan[] = [
       'Up to 4 child profiles',
       'AI Mediation assistant',
       'AI Calendar import',
-      'Community groups & schools',
-      'Caregiver portal access',
       'Google Calendar sync',
+      'Unlimited moments',
+      'Caregiver portal access',
     ],
   },
   {
     key: 'COMPLETE',
     name: 'Complete',
-    monthlyPrice: 29.99,
-    annualPrice: 23.99,
+    individualPrice: 11.99,
+    familyPrice: 19.99,
     description: 'Unlimited for blended families',
     icon: <Crown className="w-5 h-5" />,
     color: 'text-purple-600',
@@ -99,7 +98,7 @@ const PLANS: Plan[] = [
 ]
 
 export function PricingPage() {
-  const [annual, setAnnual] = useState(false)
+  const [family, setFamily] = useState(false)
   const token = useAuthStore((s) => s.token)
   const { data: subscription } = useSubscription()
   const checkout = useCreateCheckout()
@@ -111,7 +110,7 @@ export function PricingPage() {
       window.location.href = '/login'
       return
     }
-    const priceId = PRICE_IDS[plan.key][annual ? 'ANNUAL' : 'MONTHLY']
+    const priceId = PRICE_IDS[plan.key][family ? 'FAMILY' : 'INDIVIDUAL']
     checkout.mutate(priceId)
   }
 
@@ -133,17 +132,42 @@ export function PricingPage() {
           Everything you need to co-parent with confidence. Upgrade or downgrade anytime.
         </p>
 
-        {/* Billing toggle */}
-        <div className="inline-flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-3 shadow-sm">
-          <Label className="text-sm font-medium text-slate-600">Monthly</Label>
-          <Switch checked={annual} onCheckedChange={setAnnual} />
-          <Label className="text-sm font-medium text-slate-600">
-            Annual
-            <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-teal-100 text-teal-700">
-              Save 20%
+        {/* Individual / Family toggle */}
+        <div className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm">
+          <button
+            onClick={() => setFamily(false)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all',
+              !family
+                ? 'bg-teal-500 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-700',
+            )}
+          >
+            <User className="w-4 h-4" />
+            Individual
+          </button>
+          <button
+            onClick={() => setFamily(true)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all',
+              family
+                ? 'bg-teal-500 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-700',
+            )}
+          >
+            <Users className="w-4 h-4" />
+            Full Family
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-teal-100 text-teal-700">
+              Both parents
             </span>
-          </Label>
+          </button>
         </div>
+
+        {family && (
+          <p className="mt-3 text-sm text-slate-500">
+            Full Family plans give both co-parents access to all features under one subscription.
+          </p>
+        )}
       </div>
 
       {/* Plan cards */}
@@ -165,7 +189,7 @@ export function PricingPage() {
             <span className="text-slate-400 text-sm">/mo</span>
           </div>
           <ul className="space-y-2.5 mb-6">
-            {['1 child profile', 'Basic custody calendar', 'Expense tracking (limited)', 'Secure messaging'].map((f) => (
+            {['1 child profile', 'Basic custody calendar', 'Expense tracking (limited)', 'Secure messaging', 'Up to 5 moments'].map((f) => (
               <li key={f} className="flex items-start gap-2 text-sm text-slate-600">
                 <Check className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
                 {f}
@@ -179,7 +203,7 @@ export function PricingPage() {
 
         {/* Paid plan cards */}
         {PLANS.map((plan) => {
-          const price = annual ? plan.annualPrice : plan.monthlyPrice
+          const price = family ? plan.familyPrice : plan.individualPrice
           const isCurrentPlan = currentPlan === plan.key
           const isPopular = plan.badge === 'Most Popular'
 
@@ -208,16 +232,13 @@ export function PricingPage() {
               </div>
               <p className="text-sm text-slate-500 mb-4">{plan.description}</p>
 
-              <div className="mb-1">
+              <div className="mb-4">
                 <span className="text-3xl font-bold text-slate-800">${price}</span>
                 <span className="text-slate-400 text-sm">/mo</span>
+                {family && (
+                  <p className="text-xs text-teal-600 font-medium mt-1">Both parents included</p>
+                )}
               </div>
-              {annual && (
-                <p className="text-xs text-teal-600 font-medium mb-4">
-                  Billed ${(price * 12).toFixed(0)}/year
-                </p>
-              )}
-              {!annual && <div className="mb-4" />}
 
               <ul className="space-y-2.5 mb-6">
                 {plan.features.map((f) => (

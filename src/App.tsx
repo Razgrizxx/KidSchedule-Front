@@ -11,6 +11,7 @@ import { ExpensesPage } from './pages/dashboard/ExpensesPage'
 import { RequestsPage } from './pages/dashboard/RequestsPage'
 import { MomentsPage } from './pages/dashboard/MomentsPage'
 import { MediationPage } from './pages/dashboard/MediationPage'
+import { OrganizationsPage } from './pages/dashboard/OrganizationsPage'
 import { SettingsPage } from './pages/dashboard/SettingsPage'
 import { FamilyPage } from './pages/dashboard/FamilyPage'
 import { CoParentsPage } from './pages/CoParentsPage'
@@ -57,6 +58,7 @@ function App() {
             <Route path="mediation" element={<MediationPage />} />
             <Route path="family" element={<FamilyPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="organizations/:id" element={<OrganizationsPage />} />
           </Route>
           <Route path="/co-parents" element={<CoParentsPage />} />
           <Route path="/pta" element={<PTAPage />} />

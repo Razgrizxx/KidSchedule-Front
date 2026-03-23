@@ -1,0 +1,248 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import api from '@/api'
+import type { Organization, OrgEvent, OrgType, OrgRole } from '@/types/api'
+
+export const orgKeys = {
+  mine: ['organizations', 'mine'] as const,
+  detail: (id: string) => ['organizations', id] as const,
+  events: (id: string, month?: string) => ['organizations', id, 'events', month] as const,
+  allEvents: (month?: string) => ['organizations', 'events', 'all', month] as const,
+  directory: (id: string, search?: string) => ['organizations', id, 'directory', search] as const,
+  announcements: (id: string) => ['organizations', id, 'announcements'] as const,
+  venues: (id: string) => ['organizations', id, 'venues'] as const,
+  rsvps: (id: string, eventId: string) => ['organizations', id, 'events', eventId, 'rsvp'] as const,
+}
+
+// ── Queries ────────────────────────────────────────────────────────────────
+
+export function useMyOrganizations() {
+  return useQuery<Organization[]>({
+    queryKey: orgKeys.mine,
+    queryFn: () => api.get('/organizations/mine').then((r) => r.data),
+  })
+}
+
+export function useOrganization(id?: string) {
+  return useQuery<Organization>({
+    queryKey: orgKeys.detail(id!),
+    queryFn: () => api.get(`/organizations/${id}`).then((r) => r.data),
+    enabled: !!id,
+  })
+}
+
+export function useOrgEvents(orgId?: string, month?: string) {
+  return useQuery<OrgEvent[]>({
+    queryKey: orgKeys.events(orgId!, month),
+    queryFn: () =>
+      api.get(`/organizations/${orgId}/events`, { params: { month } }).then((r) => r.data),
+    enabled: !!orgId,
+  })
+}
+
+export function useAllMyOrgEvents(month?: string) {
+  return useQuery<OrgEvent[]>({
+    queryKey: orgKeys.allEvents(month),
+    queryFn: () =>
+      api.get('/organizations/events', { params: { month } }).then((r) => r.data),
+  })
+}
+
+export function useOrgDirectory(orgId?: string, search?: string) {
+  return useQuery({
+    queryKey: orgKeys.directory(orgId!, search),
+    queryFn: () =>
+      api.get(`/organizations/${orgId}/directory`, { params: { search } }).then((r) => r.data),
+    enabled: !!orgId,
+  })
+}
+
+export function useOrgAnnouncements(orgId?: string) {
+  return useQuery({
+    queryKey: orgKeys.announcements(orgId!),
+    queryFn: () => api.get(`/organizations/${orgId}/announcements`).then((r) => r.data),
+    enabled: !!orgId,
+  })
+}
+
+export function useOrgVenues(orgId?: string) {
+  return useQuery({
+    queryKey: orgKeys.venues(orgId!),
+    queryFn: () => api.get(`/organizations/${orgId}/venues`).then((r) => r.data),
+    enabled: !!orgId,
+  })
+}
+
+export function useEventRsvps(orgId?: string, eventId?: string) {
+  return useQuery({
+    queryKey: orgKeys.rsvps(orgId!, eventId!),
+    queryFn: () =>
+      api.get(`/organizations/${orgId}/events/${eventId}/rsvp`).then((r) => r.data),
+    enabled: !!orgId && !!eventId,
+  })
+}
+
+// ── Mutations ──────────────────────────────────────────────────────────────
+
+export function useCreateOrg() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { name: string; type: OrgType; description?: string; isPublic?: boolean }) =>
+      api.post('/organizations', body).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: orgKeys.mine }),
+  })
+}
+
+export function useJoinOrg() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (inviteCode: string) =>
+      api.post('/organizations/join', { inviteCode }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: orgKeys.mine }),
+  })
+}
+
+export function useLeaveOrg() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (orgId: string) =>
+      api.delete(`/organizations/${orgId}/leave`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: orgKeys.mine }),
+  })
+}
+
+export function useDeleteOrg() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (orgId: string) =>
+      api.delete(`/organizations/${orgId}`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: orgKeys.mine }),
+  })
+}
+
+export function useCreateOrgEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, ...body }: {
+      orgId: string; title: string; startAt: string; endAt: string
+      allDay?: boolean; notes?: string; venueId?: string; maxCapacity?: number
+    }) => api.post(`/organizations/${orgId}/events`, body).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['organizations', vars.orgId, 'events'] })
+      void qc.invalidateQueries({ queryKey: orgKeys.allEvents() })
+    },
+  })
+}
+
+export function useBulkCreateOrgEvents() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, ...body }: {
+      orgId: string; title: string; dates: string[]
+      startTime?: string; endTime?: string; allDay?: boolean
+      venueId?: string; maxCapacity?: number
+    }) => api.post(`/organizations/${orgId}/events/bulk`, body).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['organizations', vars.orgId, 'events'] })
+      void qc.invalidateQueries({ queryKey: orgKeys.allEvents() })
+    },
+  })
+}
+
+export function useDeleteOrgEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, eventId }: { orgId: string; eventId: string }) =>
+      api.delete(`/organizations/${orgId}/events/${eventId}`).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['organizations', vars.orgId, 'events'] })
+      void qc.invalidateQueries({ queryKey: orgKeys.allEvents() })
+    },
+  })
+}
+
+export function useUpsertRsvp() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, eventId, status, notes }: {
+      orgId: string; eventId: string; status: 'YES' | 'NO' | 'MAYBE'; notes?: string
+    }) => api.post(`/organizations/${orgId}/events/${eventId}/rsvp`, { status, notes }).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: orgKeys.rsvps(vars.orgId, vars.eventId) })
+      void qc.invalidateQueries({ queryKey: ['organizations', vars.orgId, 'events'] })
+    },
+  })
+}
+
+export function useApproveMember() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, userId }: { orgId: string; userId: string }) =>
+      api.patch(`/organizations/${orgId}/members/${userId}/approve`).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.detail(vars.orgId) }),
+  })
+}
+
+export function useRejectMember() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, userId }: { orgId: string; userId: string }) =>
+      api.delete(`/organizations/${orgId}/members/${userId}/reject`).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.detail(vars.orgId) }),
+  })
+}
+
+export function useUpdateMemberRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, userId, role }: { orgId: string; userId: string; role: OrgRole }) =>
+      api.patch(`/organizations/${orgId}/members/${userId}/role`, { role }).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.detail(vars.orgId) }),
+  })
+}
+
+export function useRemoveMember() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, userId }: { orgId: string; userId: string }) =>
+      api.delete(`/organizations/${orgId}/members/${userId}`).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.detail(vars.orgId) }),
+  })
+}
+
+export function useCreateVenue() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, ...body }: {
+      orgId: string; name: string; address?: string; mapUrl?: string; notes?: string
+    }) => api.post(`/organizations/${orgId}/venues`, body).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.venues(vars.orgId) }),
+  })
+}
+
+export function useDeleteVenue() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, venueId }: { orgId: string; venueId: string }) =>
+      api.delete(`/organizations/${orgId}/venues/${venueId}`).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.venues(vars.orgId) }),
+  })
+}
+
+export function useCreateAnnouncement() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, ...body }: {
+      orgId: string; title: string; content: string; pinned?: boolean
+    }) => api.post(`/organizations/${orgId}/announcements`, body).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.announcements(vars.orgId) }),
+  })
+}
+
+export function useDeleteAnnouncement() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, announcementId }: { orgId: string; announcementId: string }) =>
+      api.delete(`/organizations/${orgId}/announcements/${announcementId}`).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.announcements(vars.orgId) }),
+  })
+}

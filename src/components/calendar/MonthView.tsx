@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Loader2, Pencil, Trash2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCustodyEvents, useEvents, useDeleteEvent } from '@/hooks/useCalendar'
+import { useAllMyOrgEvents } from '@/hooks/useOrganizations'
 import { useCalendarStore } from '@/store/calendarStore'
 import { toast } from '@/hooks/use-toast'
 import {
@@ -45,6 +46,7 @@ export function MonthView({
 
   const { data: allCustodyEvents, isLoading: custodyLoading } = useCustodyEvents(familyId, monthKey)
   const { data: calendarEvents } = useEvents(familyId, monthKey)
+  const { data: orgEvents = [] } = useAllMyOrgEvents(monthKey)
 
   const custodyEvents = selectedChildId
     ? (allCustodyEvents ?? []).filter((e) => e.childId === selectedChildId)
@@ -67,6 +69,9 @@ export function MonthView({
     (e) => e.date.slice(0, 10) === selectedDateStr,
   )
   const selectedDayCalendarEvents = filteredCalendarEvents.filter(
+    (e) => e.startAt.slice(0, 10) === selectedDateStr,
+  )
+  const selectedDayOrgEvents = orgEvents.filter(
     (e) => e.startAt.slice(0, 10) === selectedDateStr,
   )
 
@@ -114,8 +119,10 @@ export function MonthView({
             const dayEvents = filteredCalendarEvents.filter(
               (e) => e.startAt.slice(0, 10) === iso,
             )
+            const dayOrgEvents = orgEvents.filter((e) => e.startAt.slice(0, 10) === iso)
+            const allDayEvents = [...dayEvents, ...dayOrgEvents]
             const visibleEvents = dayEvents.slice(0, 2)
-            const extraCount = dayEvents.length - 2
+            const extraCount = allDayEvents.length - 2
 
             return (
               <button
@@ -140,7 +147,7 @@ export function MonthView({
                 {isToday && !parentColor && (
                   <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-teal-400" />
                 )}
-                {dayEvents.length > 0 && (
+                {allDayEvents.length > 0 && (
                   <span className="absolute top-0.5 right-0.5 flex items-center gap-px">
                     {visibleEvents.map((ev, idx) => {
                       const Icon = EVENT_TYPE_ICONS[ev.type]
@@ -159,6 +166,18 @@ export function MonthView({
                         </span>
                       )
                     })}
+                    {dayOrgEvents.length > 0 && dayEvents.length < 2 && (
+                      <span
+                        className="w-3.5 h-3.5 rounded-full flex items-center justify-center"
+                        style={{
+                          backgroundColor: parentColor ? 'rgba(255,255,255,0.92)' : '#dcfce7',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+                        }}
+                        title={dayOrgEvents[0].organization.name}
+                      >
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#16a34a', display: 'block' }} />
+                      </span>
+                    )}
                     {extraCount > 0 && (
                       <span
                         className="h-3.5 rounded-full flex items-center justify-center font-bold"
@@ -271,7 +290,26 @@ export function MonthView({
             </div>
           ))}
 
-          {selectedDayEvents.length === 0 && selectedDayCalendarEvents.length === 0 && (
+          {selectedDayOrgEvents.map((ev) => (
+            <div
+              key={ev.id}
+              className="flex items-center gap-2 p-2.5 rounded-xl bg-green-50 border border-green-100"
+            >
+              <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-green-500" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-green-800 truncate">{ev.title}</p>
+                <p className="text-[10px] text-green-500">
+                  {ev.allDay ? 'All day' : `${ev.startAt.slice(11, 16)} – ${ev.endAt.slice(11, 16)}`}
+                  {' · '}
+                  <span className="font-medium">{ev.organization.name}</span>
+                  {' · '}
+                  {ev.organization.type === 'SCHOOL' ? 'School' : 'Team'}
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {selectedDayEvents.length === 0 && selectedDayCalendarEvents.length === 0 && selectedDayOrgEvents.length === 0 && (
             <p className="text-xs text-slate-400 py-1">No events on this day.</p>
           )}
         </div>

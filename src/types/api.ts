@@ -251,3 +251,95 @@ export interface UserSettings {
   createdAt: string
   updatedAt: string
 }
+
+
+// ── Organizations ──────────────────────────────────────────────────────────
+
+export type OrgType = 'TEAM' | 'SCHOOL'
+export type OrgRole = 'OWNER' | 'ADMIN' | 'VOLUNTEER' | 'MEMBER'
+export type OrgMemberStatus = 'PENDING' | 'ACTIVE'
+export type RsvpStatus = 'YES' | 'NO' | 'MAYBE'
+
+export interface OrgMember {
+  id: string
+  userId: string
+  organizationId: string
+  role: OrgRole
+  status: OrgMemberStatus
+  joinedAt: string
+  approvedAt?: string
+  user: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+    avatarUrl?: string
+  }
+}
+
+export interface Venue {
+  id: string
+  organizationId: string
+  name: string
+  address?: string
+  mapUrl?: string
+  notes?: string
+  createdAt: string
+}
+
+export interface OrgRsvp {
+  id: string
+  orgEventId: string
+  userId: string
+  status: RsvpStatus
+  notes?: string
+  user: { id: string; firstName: string; lastName: string; avatarUrl?: string }
+}
+
+export interface Announcement {
+  id: string
+  organizationId: string
+  authorId: string
+  title: string
+  content: string
+  pinned: boolean
+  createdAt: string
+  author: { id: string; firstName: string; lastName: string }
+}
+
+export interface Organization {
+  id: string
+  name: string
+  type: OrgType
+  inviteCode: string
+  adminId: string
+  isPublic: boolean
+  description?: string
+  role: OrgRole
+  myRole?: OrgRole
+  myStatus?: OrgMemberStatus
+  members?: OrgMember[]
+  venues?: Venue[]
+  createdAt: string
+  updatedAt: string
+  _count?: { members: number; events: number; announcements: number }
+}
+
+export interface OrgEvent {
+  id: string
+  organizationId: string
+  createdById: string
+  title: string
+  type: EventType
+  startAt: string
+  endAt: string
+  allDay: boolean
+  notes?: string
+  venueId?: string
+  maxCapacity?: number
+  createdAt: string
+  organization: { id: string; name: string; type: OrgType }
+  venue?: Venue
+  rsvps?: OrgRsvp[]
+  _count?: { rsvps: number }
+}

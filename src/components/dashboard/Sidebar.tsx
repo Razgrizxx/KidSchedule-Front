@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -12,11 +13,27 @@ import {
   LogOut,
   Calendar,
   X,
+  Plus,
+  School,
+  Trophy,
+  ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useMyOrganizations, useCreateOrg, useJoinOrg } from '@/hooks/useOrganizations'
+import { toast } from '@/hooks/use-toast'
+import type { OrgType } from '@/types/api'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
@@ -29,6 +46,133 @@ const navItems = [
   { label: 'Mediation', icon: Scale, to: '/dashboard/mediation' },
 ]
 
+const ORG_COLORS: Record<OrgType, string> = {
+  TEAM: 'bg-orange-100 text-orange-600',
+  SCHOOL: 'bg-blue-100 text-blue-600',
+}
+
+// ── Join or Create modal ───────────────────────────────────────────────────
+
+function OrgModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [tab, setTab] = useState<'join' | 'create'>('join')
+  const [code, setCode] = useState('')
+  const [name, setName] = useState('')
+  const [type, setType] = useState<OrgType>('SCHOOL')
+
+  const joinOrg = useJoinOrg()
+  const createOrg = useCreateOrg()
+
+  function reset() {
+    setCode('')
+    setName('')
+    setType('SCHOOL')
+  }
+
+  async function handleJoin() {
+    if (!code.trim()) return
+    try {
+      await joinOrg.mutateAsync(code.trim())
+      toast({ title: 'Joined!', description: 'You have joined the organization.' })
+      reset()
+      onClose()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.response?.data?.message ?? 'Invalid code', variant: 'destructive' })
+    }
+  }
+
+  async function handleCreate() {
+    if (!name.trim()) return
+    try {
+      const org = await createOrg.mutateAsync({ name: name.trim(), type })
+      toast({ title: 'Created!', description: `Invite code: ${org.inviteCode}` })
+      reset()
+      onClose()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.response?.data?.message ?? 'Could not create', variant: 'destructive' })
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose() } }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Groups</DialogTitle>
+        </DialogHeader>
+
+        {/* Tabs */}
+        <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
+          {(['join', 'create'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={cn(
+                'flex-1 py-1.5 rounded-lg text-sm font-medium transition-all',
+                tab === t ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500',
+              )}
+            >
+              {t === 'join' ? 'Join a Group' : 'New Group'}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'join' ? (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-500">Enter the invite code shared by the group admin.</p>
+            <div className="space-y-1.5">
+              <Label>Invite Code</Label>
+              <Input
+                placeholder="KID-XXXX"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+              />
+            </div>
+            <Button className="w-full" onClick={handleJoin} disabled={joinOrg.isPending}>
+              {joinOrg.isPending ? 'Joining…' : 'Join Group'}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Group Name</Label>
+              <Input
+                placeholder="Soccer Team U10"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <div className="flex gap-2">
+                {(['SCHOOL', 'TEAM'] as OrgType[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setType(t)}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-all',
+                      type === t
+                        ? 'border-teal-400 bg-teal-50 text-teal-700'
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300',
+                    )}
+                  >
+                    {t === 'SCHOOL' ? <School className="w-4 h-4" /> : <Trophy className="w-4 h-4" />}
+                    {t === 'SCHOOL' ? 'School' : 'Team'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Button className="w-full" onClick={handleCreate} disabled={createOrg.isPending}>
+              {createOrg.isPending ? 'Creating…' : 'Create Group'}
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Sidebar ────────────────────────────────────────────────────────────────
+
 interface SidebarProps {
   mobileOpen: boolean
   onClose: () => void
@@ -38,6 +182,9 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
+  const [orgModalOpen, setOrgModalOpen] = useState(false)
+
+  const { data: orgs = [] } = useMyOrganizations()
 
   function handleLogout() {
     logout()
@@ -81,6 +228,56 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             {label}
           </NavLink>
         ))}
+
+        {/* My Groups section */}
+        <div className="pt-3">
+          <div className="flex items-center justify-between px-3 pb-1">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              My Groups
+            </span>
+            <button
+              onClick={() => setOrgModalOpen(true)}
+              className="p-0.5 rounded-md text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+              title="Join or create a group"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {orgs.length === 0 ? (
+            <button
+              onClick={() => setOrgModalOpen(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Join or create a group
+            </button>
+          ) : (
+            <div className="space-y-0.5">
+              {orgs.map((org) => (
+                <NavLink
+                  key={org.id}
+                  to={`/dashboard/organizations/${org.id}`}
+                  onClick={onClose}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all',
+                      isActive
+                        ? 'bg-teal-50 text-teal-700 font-medium'
+                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800',
+                    )
+                  }
+                >
+                  <span className={cn('w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0', ORG_COLORS[org.type])}>
+                    {org.type === 'SCHOOL' ? <School className="w-3 h-3" /> : <Trophy className="w-3 h-3" />}
+                  </span>
+                  <span className="truncate flex-1 text-sm">{org.name}</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </div>
       </nav>
 
       <Separator />
@@ -126,6 +323,8 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           </div>
         </div>
       </div>
+
+      <OrgModal open={orgModalOpen} onClose={() => setOrgModalOpen(false)} />
     </div>
   )
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Baby, Users, UserPlus, Plus, Shield, Mail, Loader2, Share2, Lock } from 'lucide-react'
+import { Baby, Users, UserPlus, Plus, Shield, Mail, Loader2, Share2, Lock, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,13 +16,23 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   useFamilies,
   useFamily,
   useChildren,
   useCaregivers,
   useAddChild,
   useInviteMember,
+  useUpdateCaregiver,
+  useRemoveCaregiver,
   type CreateChildDto,
+  type UpdateCaregiverDto,
 } from '@/hooks/useDashboard'
 import { InviteCaregiverModal } from '@/components/dashboard/InviteCaregiverModal'
 import { useAuthStore } from '@/store/authStore'
@@ -108,10 +118,18 @@ function MemberRow({ member, isMe }: { member: FamilyMember; isMe: boolean }) {
 
 // ─── Caregiver row ────────────────────────────────────────────────────────────
 
-function CaregiverRow({ caregiver }: { caregiver: Caregiver }) {
+function CaregiverRow({
+  caregiver,
+  onEdit,
+  onDelete,
+}: {
+  caregiver: Caregiver
+  onEdit: (c: Caregiver) => void
+  onDelete: (c: Caregiver) => void
+}) {
   const initials = caregiver.name.slice(0, 2).toUpperCase()
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
+    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0 group">
       <Avatar className="h-9 w-9 shrink-0">
         <AvatarFallback className="text-xs bg-purple-50 text-purple-600">{initials}</AvatarFallback>
       </Avatar>
@@ -133,6 +151,22 @@ function CaregiverRow({ caregiver }: { caregiver: Caregiver }) {
           Private
         </span>
       )}
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <button
+          onClick={() => onEdit(caregiver)}
+          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          title="Edit"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={() => onDelete(caregiver)}
+          className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+          title="Delete"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   )
 }
@@ -169,6 +203,52 @@ export function FamilyPage() {
 
   const addChild = useAddChild(familyId ?? '')
   const inviteMember = useInviteMember(familyId ?? '')
+  const updateCaregiver = useUpdateCaregiver(familyId ?? '')
+  const removeCaregiver = useRemoveCaregiver(familyId ?? '')
+
+  // ── Edit Caregiver dialog ─────────────────────────────────────────────────
+  const [editingCaregiver, setEditingCaregiver] = useState<Caregiver | null>(null)
+  const [editForm, setEditForm] = useState<UpdateCaregiverDto>({})
+
+  function openEdit(c: Caregiver) {
+    setEditingCaregiver(c)
+    setEditForm({
+      name: c.name,
+      email: c.email ?? '',
+      relationship: c.relationship ?? '',
+      visibility: c.visibility,
+      linkExpiry: c.linkExpiry,
+      canViewCalendar: c.canViewCalendar,
+      canViewHealthInfo: c.canViewHealthInfo,
+      canViewEmergencyContacts: c.canViewEmergencyContacts,
+      canViewAllergies: c.canViewAllergies,
+    })
+  }
+
+  async function handleEdit() {
+    if (!editingCaregiver) return
+    try {
+      await updateCaregiver.mutateAsync({ id: editingCaregiver.id, ...editForm })
+      toast({ title: 'Caregiver updated', variant: 'success' })
+      setEditingCaregiver(null)
+    } catch {
+      toast({ title: 'Could not update caregiver', variant: 'error' })
+    }
+  }
+
+  // ── Delete Caregiver confirm ───────────────────────────────────────────────
+  const [deletingCaregiver, setDeletingCaregiver] = useState<Caregiver | null>(null)
+
+  async function handleDelete() {
+    if (!deletingCaregiver) return
+    try {
+      await removeCaregiver.mutateAsync(deletingCaregiver.id)
+      toast({ title: `${deletingCaregiver.name} removed`, variant: 'success' })
+      setDeletingCaregiver(null)
+    } catch {
+      toast({ title: 'Could not delete caregiver', variant: 'error' })
+    }
+  }
 
   // ── Add Child dialog ──────────────────────────────────────────────────────
   const [childOpen, setChildOpen] = useState(false)
@@ -378,7 +458,14 @@ export function FamilyPage() {
               </p>
             </div>
           ) : (
-            caregivers.map((c) => <CaregiverRow key={c.id} caregiver={c} />)
+            caregivers.map((c) => (
+              <CaregiverRow
+                key={c.id}
+                caregiver={c}
+                onEdit={openEdit}
+                onDelete={setDeletingCaregiver}
+              />
+            ))
           )}
         </CardContent>
       </Card>
@@ -450,6 +537,140 @@ export function FamilyPage() {
             >
               {addChild.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               Add Child
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Caregiver Dialog ─────────────────────────────────────────── */}
+      <Dialog open={!!editingCaregiver} onOpenChange={(o) => { if (!o) setEditingCaregiver(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Caregiver</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Name *</Label>
+                <Input
+                  value={editForm.name ?? ''}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Relationship</Label>
+                <Select
+                  value={editForm.relationship ?? ''}
+                  onValueChange={(v) => setEditForm((f) => ({ ...f, relationship: v }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectContent>
+                    {['Grandparent', 'Aunt / Uncle', 'Nanny / Au Pair', 'Family Friend', 'Teacher', 'Coach', 'Babysitter', 'Other'].map((r) => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Email <span className="text-slate-400">(optional)</span></Label>
+              <Input
+                type="email"
+                value={editForm.email ?? ''}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Visibility</Label>
+              <div className="flex gap-2">
+                {(['SHARED', 'PRIVATE'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setEditForm((f) => ({ ...f, visibility: v }))}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-medium transition-all ${
+                      editForm.visibility === v
+                        ? v === 'SHARED' ? 'bg-purple-50 border-purple-300 text-purple-600' : 'bg-slate-50 border-slate-300 text-slate-600'
+                        : 'border-slate-100 text-slate-400 hover:border-slate-200'
+                    }`}
+                  >
+                    {v === 'SHARED' ? <Share2 className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                    {v === 'SHARED' ? 'Shared' : 'Private'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Permissions</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    { key: 'canViewCalendar', label: 'Calendar' },
+                    { key: 'canViewHealthInfo', label: 'Child Info' },
+                    { key: 'canViewEmergencyContacts', label: 'Emergency Contacts' },
+                    { key: 'canViewAllergies', label: 'Allergies' },
+                  ] as const
+                ).map((p) => {
+                  const checked = editForm[p.key]
+                  return (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => setEditForm((f) => ({ ...f, [p.key]: !f[p.key] }))}
+                      className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${
+                        checked ? 'border-teal-300 bg-teal-50' : 'border-slate-100 bg-white hover:border-slate-200'
+                      }`}
+                    >
+                      <div className={`w-3.5 h-3.5 rounded border transition-colors shrink-0 flex items-center justify-center ${checked ? 'bg-teal-400 border-teal-400' : 'border-slate-300'}`}>
+                        {checked && (
+                          <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                            <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className={`text-xs font-medium ${checked ? 'text-teal-700' : 'text-slate-700'}`}>{p.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingCaregiver(null)}>Cancel</Button>
+            <Button
+              onClick={() => void handleEdit()}
+              disabled={updateCaregiver.isPending || !editForm.name?.trim()}
+            >
+              {updateCaregiver.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Caregiver Confirm ──────────────────────────────────────── */}
+      <Dialog open={!!deletingCaregiver} onOpenChange={(o) => { if (!o) setDeletingCaregiver(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <DialogTitle>Remove caregiver?</DialogTitle>
+            </div>
+          </DialogHeader>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            <strong className="text-slate-700">{deletingCaregiver?.name}</strong> will lose access to your family's information. This cannot be undone.
+          </p>
+          <DialogFooter className="gap-2 mt-2">
+            <Button variant="outline" onClick={() => setDeletingCaregiver(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => void handleDelete()}
+              disabled={removeCaregiver.isPending}
+            >
+              {removeCaregiver.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Remove
             </Button>
           </DialogFooter>
         </DialogContent>

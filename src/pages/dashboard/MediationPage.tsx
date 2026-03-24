@@ -74,7 +74,7 @@ function NewSessionModal({
         setTopic('')
         onClose()
       },
-      onError: () => toast({ title: 'Error', description: 'Could not create session', variant: 'destructive' }),
+      onError: () => toast({ title: 'Error', description: 'Could not create session', variant: 'error' }),
     })
   }
 
@@ -135,7 +135,7 @@ function ProposeModal({
         setSummary('')
         onClose()
       },
-      onError: () => toast({ title: 'Error', description: 'Could not submit proposal', variant: 'destructive' }),
+      onError: () => toast({ title: 'Error', description: 'Could not submit proposal', variant: 'error' }),
     })
   }
 
@@ -190,7 +190,7 @@ function EscalateModal({
         toast({ title: 'Session escalated to professional mediation' })
         onClose()
       },
-      onError: () => toast({ title: 'Error', variant: 'destructive' }),
+      onError: () => toast({ title: 'Error', variant: 'error' }),
     })
   }
 
@@ -208,7 +208,7 @@ function EscalateModal({
         </p>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="destructive" onClick={confirm} disabled={escalate.isPending}>
+          <Button className="bg-red-500 hover:bg-red-600 text-white" onClick={confirm} disabled={escalate.isPending}>
             {escalate.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
             Escalate
           </Button>
@@ -340,7 +340,7 @@ function ProposalCard({
 
   function handleRespond(action: 'ACCEPTED' | 'REJECTED') {
     respond.mutate({ proposalId: proposal.id, action }, {
-      onError: () => toast({ title: 'Error', variant: 'destructive' }),
+      onError: () => toast({ title: 'Error', variant: 'error' }),
     })
   }
 
@@ -467,14 +467,14 @@ function MediationRoom({
   function handleSend() {
     if (!text.trim() || !isActive) return
     sendMessage.mutate({ content: text.trim() }, {
-      onError: () => toast({ title: 'Error', variant: 'destructive' }),
+      onError: () => toast({ title: 'Error', variant: 'error' }),
     })
     setText('')
   }
 
   function handleAskAI() {
     askAI.mutate(undefined, {
-      onError: () => toast({ title: 'Error', description: 'AI unavailable', variant: 'destructive' }),
+      onError: () => toast({ title: 'Error', description: 'AI unavailable', variant: 'error' }),
     })
   }
 

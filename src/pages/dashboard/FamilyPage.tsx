@@ -665,7 +665,7 @@ export function FamilyPage() {
           <DialogFooter className="gap-2 mt-2">
             <Button variant="outline" onClick={() => setDeletingCaregiver(null)}>Cancel</Button>
             <Button
-              variant="destructive"
+              className="bg-red-500 hover:bg-red-600 text-white"
               onClick={() => void handleDelete()}
               disabled={removeCaregiver.isPending}
             >

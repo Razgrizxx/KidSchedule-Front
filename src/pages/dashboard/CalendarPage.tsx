@@ -34,6 +34,7 @@ import { YearView } from '@/components/calendar/YearView'
 import { useCalendarStore } from '@/store/calendarStore'
 import { buildParentColorMap, MONTHS_LONG, MONTHS_SHORT, focusToYearMonth } from '@/lib/calendarUtils'
 import type { CustodyPattern, FamilyMember, CalendarEvent } from '@/types/api'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ export function CalendarPage() {
         title: '¡Calendario sincronizado!',
         description: `${result.synced + result.custodySynced} events exported. Check your Google Calendar.`,
       })
-    } catch {
+    } catch (err) {
       toast({ title: 'Export failed', description: 'Could not sync to Google Calendar.', variant: 'error' })
     }
   }
@@ -169,8 +170,8 @@ export function CalendarPage() {
       toast({ title: 'Schedule created!', variant: 'success' })
       setWizardOpen(false)
       reset()
-    } catch {
-      toast({ title: 'Failed to create schedule', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to create schedule', description: getErrorMessage(err), variant: 'error' })
     }
   }
 

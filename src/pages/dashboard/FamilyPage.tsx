@@ -38,6 +38,7 @@ import { InviteCaregiverModal } from '@/components/dashboard/InviteCaregiverModa
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/hooks/use-toast'
 import type { Child, FamilyMember, Caregiver } from '@/types/api'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -231,8 +232,8 @@ export function FamilyPage() {
       await updateCaregiver.mutateAsync({ id: editingCaregiver.id, ...editForm })
       toast({ title: 'Caregiver updated', variant: 'success' })
       setEditingCaregiver(null)
-    } catch {
-      toast({ title: 'Could not update caregiver', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Could not update caregiver', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
@@ -245,8 +246,8 @@ export function FamilyPage() {
       await removeCaregiver.mutateAsync(deletingCaregiver.id)
       toast({ title: `${deletingCaregiver.name} removed`, variant: 'success' })
       setDeletingCaregiver(null)
-    } catch {
-      toast({ title: 'Could not delete caregiver', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Could not delete caregiver', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
@@ -266,8 +267,8 @@ export function FamilyPage() {
       toast({ title: 'Child added!', variant: 'success' })
       setChildOpen(false)
       setChildForm({ firstName: '', lastName: '', dateOfBirth: '', color: CHILD_COLORS[0] })
-    } catch {
-      toast({ title: 'Could not add child', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Could not add child', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
@@ -290,8 +291,8 @@ export function FamilyPage() {
       })
       setInviteOpen(false)
       setInviteEmail('')
-    } catch {
-      toast({ title: 'Could not send invitation', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Could not send invitation', description: getErrorMessage(err), variant: 'error' })
     }
   }
 

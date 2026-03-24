@@ -20,6 +20,7 @@ import { toast } from '@/hooks/use-toast'
 import type { Message } from '@/types/api'
 import { cn } from '@/lib/utils'
 import jsPDF from 'jspdf'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 
 // ── PDF export ────────────────────────────────────────────────────────────────
 
@@ -251,8 +252,8 @@ function PhoneVerificationGate() {
       await sendCode.mutateAsync(phone.trim())
       setCodeSent(true)
       toast({ title: 'Verification code sent', variant: 'success' })
-    } catch {
-      toast({ title: 'Failed to send code', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to send code', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
@@ -261,8 +262,8 @@ function PhoneVerificationGate() {
     try {
       await verifyPhone.mutateAsync({ phone: phone.trim(), code: code.trim() })
       toast({ title: 'Phone verified! You can now use messaging.', variant: 'success' })
-    } catch {
-      toast({ title: 'Invalid or expired code', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Invalid or expired code', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
@@ -380,8 +381,8 @@ export function MessagesPage() {
     sendStopTyping()
     try {
       await sendMessage.mutateAsync(content)
-    } catch {
-      toast({ title: 'Failed to send message', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to send message', description: getErrorMessage(err), variant: 'error' })
       setText(content)
     }
   }

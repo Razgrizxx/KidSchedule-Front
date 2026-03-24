@@ -16,6 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useHolidays, useBulkImport } from '@/hooks/useCalendar'
 import { toast } from '@/hooks/use-toast'
 import type { Child, EventVisibility } from '@/types/api'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -119,8 +120,8 @@ export function ImportEventsModal({ open, onClose, familyId, children }: Props) 
         : `${result.created} event${result.created !== 1 ? 's' : ''} imported`
       toast({ title: msg, variant: 'success' })
       onClose()
-    } catch {
-      toast({ title: 'Failed to import events', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to import events', description: getErrorMessage(err), variant: 'error' })
     }
   }
 

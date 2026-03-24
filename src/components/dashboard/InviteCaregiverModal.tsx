@@ -20,6 +20,7 @@ import {
 import { useAddCaregiver, type CreateCaregiverDto } from '@/hooks/useDashboard'
 import { Switch } from '@/components/ui/switch'
 import { toast } from '@/hooks/use-toast'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -139,8 +140,8 @@ export function InviteCaregiverModal({
         variant: 'success',
       })
       handleClose()
-    } catch {
-      toast({ title: 'Could not add caregiver', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Could not add caregiver', description: getErrorMessage(err), variant: 'error' })
     }
   }
 

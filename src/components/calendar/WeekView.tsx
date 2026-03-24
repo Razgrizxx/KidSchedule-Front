@@ -14,6 +14,7 @@ import {
   getWeekMonthKeys,
 } from '@/lib/calendarUtils'
 import type { CalendarEvent, Child, CustodyEvent, FamilyMember } from '@/types/api'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 
 interface Props {
   familyId: string
@@ -91,8 +92,8 @@ export function WeekView({
       await deleteEvent.mutateAsync({ familyId, eventId })
       setConfirmDeleteId(null)
       toast({ title: 'Event deleted', variant: 'success' })
-    } catch {
-      toast({ title: 'Failed to delete event', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to delete event', description: getErrorMessage(err), variant: 'error' })
     }
   }
 

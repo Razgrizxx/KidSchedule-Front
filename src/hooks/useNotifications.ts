@@ -102,7 +102,7 @@ export function useNotifications() {
       (e) => !e.isSettled && e.paidBy !== user?.id,
     )
     if (unsettledOwed.length > 0) {
-      const total = unsettledOwed.reduce((sum, e) => sum + e.amount * (1 - (e.splitRatio ?? 0.5)), 0)
+      const total = unsettledOwed.reduce((sum, e) => sum + Number(e.amount) * (1 - Number(e.splitRatio ?? 0.5)), 0)
       items.push({
         id: 'expenses',
         type: 'expense',

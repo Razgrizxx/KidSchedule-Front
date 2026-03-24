@@ -128,7 +128,7 @@ export function CalendarPage() {
         description: `${result.synced + result.custodySynced} events exported. Check your Google Calendar.`,
       })
     } catch {
-      toast({ title: 'Export failed', description: 'Could not sync to Google Calendar.', variant: 'destructive' })
+      toast({ title: 'Export failed', description: 'Could not sync to Google Calendar.', variant: 'error' })
     }
   }
 

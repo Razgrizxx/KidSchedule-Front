@@ -79,7 +79,7 @@ function OrgModal({ open, onClose }: { open: boolean; onClose: () => void }) {
       reset()
       onClose()
     } catch (e: any) {
-      toast({ title: 'Error', description: e?.response?.data?.message ?? 'Invalid code', variant: 'destructive' })
+      toast({ title: 'Error', description: e?.response?.data?.message ?? 'Invalid code', variant: 'error' })
     }
   }
 
@@ -91,7 +91,7 @@ function OrgModal({ open, onClose }: { open: boolean; onClose: () => void }) {
       reset()
       onClose()
     } catch (e: any) {
-      toast({ title: 'Error', description: e?.response?.data?.message ?? 'Could not create', variant: 'destructive' })
+      toast({ title: 'Error', description: e?.response?.data?.message ?? 'Could not create', variant: 'error' })
     }
   }
 

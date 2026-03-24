@@ -15,8 +15,9 @@ export function DashboardLayout() {
   const accessMode = useAuthStore((s) => s.accessMode)
 
   // Global WebSocket: live notifications, mediation AI push, request updates
-  const { data: families } = useFamilies()
-  useAppSocket(families?.[0]?.id)
+  // Disabled in caregiver mode — no JWT token, would trigger 401 + clearCaregiverAccess
+  const { data: families } = useFamilies({ enabled: accessMode !== 'caregiver' })
+  useAppSocket(accessMode !== 'caregiver' ? families?.[0]?.id : undefined)
 
   // Caregiver mode: bypass the full parent layout entirely
   if (accessMode === 'caregiver') {

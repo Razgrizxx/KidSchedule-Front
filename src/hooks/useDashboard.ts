@@ -2,10 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api'
 import type { Family, Child, Caregiver } from '@/types/api'
 
-export function useFamilies() {
+export function useFamilies({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery<Family[]>({
     queryKey: ['families'],
     queryFn: () => api.get('/families').then((r) => r.data),
+    enabled,
   })
 }
 

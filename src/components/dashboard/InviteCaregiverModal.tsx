@@ -110,7 +110,7 @@ export function InviteCaregiverModal({
   isShared,
 }: InviteCaregiverModalProps) {
   const [form, setForm] = useState<CreateCaregiverDto>(() => defaultForm(isShared))
-  const [sendEmail, setSendEmail] = useState(false)
+  const [sendEmail, setSendEmail] = useState(true)
   const addCaregiver = useAddCaregiver(familyId)
 
   function handleClose() {

@@ -112,3 +112,27 @@ export function useAddCaregiver(familyId: string) {
     },
   })
 }
+
+export type UpdateCaregiverDto = Partial<Omit<CreateCaregiverDto, 'sendEmail'>>
+
+export function useUpdateCaregiver(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...dto }: UpdateCaregiverDto & { id: string }) =>
+      api.patch(`/families/${familyId}/caregivers/${id}`, dto).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['caregivers', familyId] })
+    },
+  })
+}
+
+export function useRemoveCaregiver(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/families/${familyId}/caregivers/${id}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['caregivers', familyId] })
+    },
+  })
+}

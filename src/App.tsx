@@ -22,6 +22,7 @@ import { BlogListPage } from './pages/BlogListPage'
 import { BlogDetailPage } from './pages/BlogDetailPage'
 import { JoinPage } from './pages/JoinPage'
 import { CaregiverAccessPage } from './pages/CaregiverAccessPage'
+import { PricingPage } from './pages/PricingPage'
 import { Toaster } from './components/ui/toaster'
 import { useAuthStore } from './store/authStore'
 
@@ -66,6 +67,7 @@ function App() {
           <Route path="/families" element={<FamiliesPage />} />
           <Route path="/blog" element={<BlogListPage />} />
           <Route path="/blog/:slug" element={<BlogDetailPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
           <Route path="/join" element={<JoinPage />} />
           <Route path="/caregiver-access" element={<CaregiverAccessPage />} />
         </Routes>

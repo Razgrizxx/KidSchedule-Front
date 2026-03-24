@@ -19,6 +19,12 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    // Normalize backend message onto err.message so catch blocks see a plain string
+    const data = err.response?.data
+    if (data?.message) {
+      err.message = Array.isArray(data.message) ? data.message[0] : String(data.message)
+    }
+
     if (err.response?.status === 401) {
       const state = useAuthStore.getState()
       if (state.accessMode === 'parent') {

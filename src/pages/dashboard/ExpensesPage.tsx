@@ -25,6 +25,7 @@ import {
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/hooks/use-toast'
 import type { ExpenseCategory } from '@/types/api'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -168,8 +169,8 @@ export function ExpensesPage() {
       setAddOpen(false)
       reset()
       clearReceipt()
-    } catch {
-      toast({ title: 'Failed to add expense', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to add expense', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
@@ -180,8 +181,8 @@ export function ExpensesPage() {
         title: unsettle ? 'Marked as pending' : 'Expense settled!',
         variant: 'success',
       })
-    } catch {
-      toast({ title: 'Failed to update expense', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to update expense', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
@@ -189,8 +190,8 @@ export function ExpensesPage() {
     try {
       const result = await settleAll.mutateAsync()
       toast({ title: `${result.settled} expense${result.settled !== 1 ? 's' : ''} settled`, variant: 'success' })
-    } catch {
-      toast({ title: 'Failed to settle expenses', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to settle expenses', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
@@ -199,8 +200,8 @@ export function ExpensesPage() {
       await deleteExpense.mutateAsync(expenseId)
       setConfirmDeleteId(null)
       toast({ title: 'Expense deleted', variant: 'success' })
-    } catch {
-      toast({ title: 'Failed to delete expense', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to delete expense', description: getErrorMessage(err), variant: 'error' })
     }
   }
 

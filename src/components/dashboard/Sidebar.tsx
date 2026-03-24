@@ -36,6 +36,7 @@ import { useMyOrganizations, useCreateOrg, useJoinOrg } from '@/hooks/useOrganiz
 import { useSubscription, canUseFeature } from '@/hooks/useSubscription'
 import { ProBadge, UpgradeModal } from '@/components/FeatureGate'
 import { toast } from '@/hooks/use-toast'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 import type { OrgType } from '@/types/api'
 
 const navItems = [
@@ -78,8 +79,8 @@ function OrgModal({ open, onClose }: { open: boolean; onClose: () => void }) {
       toast({ title: 'Joined!', description: 'You have joined the organization.' })
       reset()
       onClose()
-    } catch (e: any) {
-      toast({ title: 'Error', description: e?.response?.data?.message ?? 'Invalid code', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
@@ -90,8 +91,8 @@ function OrgModal({ open, onClose }: { open: boolean; onClose: () => void }) {
       toast({ title: 'Created!', description: `Invite code: ${org.inviteCode}` })
       reset()
       onClose()
-    } catch (e: any) {
-      toast({ title: 'Error', description: e?.response?.data?.message ?? 'Could not create', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'error' })
     }
   }
 

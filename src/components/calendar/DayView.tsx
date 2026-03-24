@@ -5,6 +5,7 @@ import { useCustodyEvents, useEvents, useDeleteEvent } from '@/hooks/useCalendar
 import { toast } from '@/hooks/use-toast'
 import { focusToYearMonth, EVENT_TYPE_ICONS, EVENT_TYPE_LABELS, formatTime } from '@/lib/calendarUtils'
 import type { CalendarEvent, Child, FamilyMember } from '@/types/api'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 
 interface Props {
   familyId: string
@@ -64,8 +65,8 @@ export function DayView({
       await deleteEvent.mutateAsync({ familyId, eventId })
       setConfirmDeleteId(null)
       toast({ title: 'Event deleted', variant: 'success' })
-    } catch {
-      toast({ title: 'Failed to delete event', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to delete event', description: getErrorMessage(err), variant: 'error' })
     }
   }
 

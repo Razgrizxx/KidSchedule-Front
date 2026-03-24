@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCreateEvent, useUpdateEvent } from '@/hooks/useCalendar'
 import { toast } from '@/hooks/use-toast'
 import type { Child, FamilyMember, EventType, EventVisibility, RepeatPattern, CalendarEvent } from '@/types/api'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -164,8 +165,8 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
         toast({ title: 'Event added!', variant: 'success' })
       }
       handleClose()
-    } catch {
-      toast({ title: 'Failed to add event', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Failed to add event', description: getErrorMessage(err), variant: 'error' })
     }
   }
 

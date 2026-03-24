@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { toast } from '@/hooks/use-toast'
 import { post } from '@/lib/api'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 import api from '@/api'
 import { useAuthStore } from '@/store/authStore'
 import type { AuthUser } from '@/store/authStore'
@@ -86,7 +87,7 @@ function LoginForm({ inviteToken }: { inviteToken: string | null }) {
     } catch (err) {
       toast({
         title: 'Login failed',
-        description: err instanceof Error ? err.message : 'Unknown error',
+        description: getErrorMessage(err),
         variant: 'error',
       })
     }
@@ -177,7 +178,7 @@ function RegisterForm({ inviteToken }: { inviteToken: string | null }) {
     } catch (err) {
       toast({
         title: 'Registration failed',
-        description: err instanceof Error ? err.message : 'Unknown error',
+        description: getErrorMessage(err),
         variant: 'error',
       })
     }

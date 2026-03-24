@@ -6,7 +6,9 @@ let socket: Socket | null = null
 export function getSocket(): Socket {
   if (!socket) {
     const token = useAuthStore.getState().token
-    socket = io('http://localhost:3000/chat', {
+    const apiUrl = (import.meta.env.VITE_API_URL as string) ?? 'http://localhost:3000/api/v1'
+    const socketBase = apiUrl.replace(/\/api\/v\d+$/, '')
+    socket = io(`${socketBase}/chat`, {
       auth: { token },
       autoConnect: true,
       reconnection: true,

@@ -19,9 +19,8 @@ export function useVerifyPhone() {
   return useMutation({
     mutationFn: ({ phone, code }: { phone: string; code: string }) =>
       api.post('/auth/phone/verify', { phone, code }).then((r) => r.data),
-    onSuccess: () => {
-      // Mark the stored user as verified without requiring a new login
-      if (user && token) setAuth({ ...user, isVerified: true }, token)
+    onSuccess: (_, { phone }) => {
+      if (user && token) setAuth({ ...user, isVerified: true, phone }, token)
     },
   })
 }

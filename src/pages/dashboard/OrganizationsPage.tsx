@@ -3,10 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   School, Trophy, Copy, Check, Trash2, UserMinus, CalendarPlus, Loader2,
   Crown, MapPin, Megaphone, Pin, UserCheck, UserX, Download, Globe,
-  Lock, Search, ChevronDown, Plus, CalendarDays,
+  Lock, Search, ChevronDown, Plus, CalendarDays, Link2,
 } from 'lucide-react'
 import {
-  useOrganization, useDeleteOrg, useLeaveOrg,
+  useOrganization, useDeleteOrg, useLeaveOrg, useUpdateOrg,
   useCreateOrgEvent, useDeleteOrgEvent, useOrgEvents,
   useApproveMember, useRejectMember, useRemoveMember, useUpdateMemberRole,
   useCreateVenue, useDeleteVenue, useOrgVenues,
@@ -447,6 +447,7 @@ export function OrganizationsPage() {
   const user = useAuthStore((s) => s.user)
   const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
   const [addEventOpen, setAddEventOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [addVenueOpen, setAddVenueOpen] = useState(false)
@@ -459,6 +460,7 @@ export function OrganizationsPage() {
   const { data: announcements = [] } = useOrgAnnouncements(id)
   const deleteOrg = useDeleteOrg()
   const leaveOrg = useLeaveOrg()
+  const updateOrg = useUpdateOrg()
   const approveM = useApproveMember()
   const rejectM = useRejectMember()
   const removeM = useRemoveMember()
@@ -492,6 +494,16 @@ export function OrganizationsPage() {
     navigator.clipboard.writeText(org!.inviteCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function copyPublicLink() {
+    navigator.clipboard.writeText(`${window.location.origin}/org/${org!.id}/calendar`)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 2000)
+  }
+
+  function togglePublic() {
+    updateOrg.mutate({ orgId: org!.id, isPublic: !org!.isPublic })
   }
 
   function downloadIcs() {
@@ -545,9 +557,26 @@ export function OrganizationsPage() {
             <Badge className={cn('border-0 text-xs', ROLE_BADGE[org.myRole ?? org.role])}>
               {org.myRole ?? org.role}
             </Badge>
-            {org.isPublic
-              ? <span className="flex items-center gap-1 text-xs text-green-600"><Globe className="w-3 h-3" /> Public</span>
-              : <span className="flex items-center gap-1 text-xs text-slate-400"><Lock className="w-3 h-3" /> Private</span>}
+            {isManager
+              ? (
+                <button
+                  onClick={togglePublic}
+                  disabled={updateOrg.isPending}
+                  className={cn(
+                    'flex items-center gap-1 text-xs rounded-full px-2 py-0.5 transition-colors',
+                    org.isPublic
+                      ? 'text-green-600 bg-green-50 hover:bg-green-100'
+                      : 'text-slate-400 bg-slate-100 hover:bg-slate-200',
+                  )}
+                  title={org.isPublic ? 'Click to make private' : 'Click to make public'}
+                >
+                  {org.isPublic ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                  {org.isPublic ? 'Public' : 'Private'}
+                </button>
+              )
+              : org.isPublic
+                ? <span className="flex items-center gap-1 text-xs text-green-600"><Globe className="w-3 h-3" /> Public</span>
+                : <span className="flex items-center gap-1 text-xs text-slate-400"><Lock className="w-3 h-3" /> Private</span>}
           </div>
           {org.description && <p className="text-sm text-slate-500 mt-1">{org.description}</p>}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -558,6 +587,12 @@ export function OrganizationsPage() {
             <button onClick={downloadIcs} className="flex items-center gap-1 text-xs text-slate-400 hover:text-teal-600 transition-colors">
               <Download className="w-3.5 h-3.5" /> .ics
             </button>
+            {org.isPublic && (
+              <button onClick={copyPublicLink} className="flex items-center gap-1 text-xs text-slate-400 hover:text-teal-600 transition-colors" title="Copy public calendar link">
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-teal-500" /> : <Link2 className="w-3.5 h-3.5" />}
+                {copiedLink ? 'Copied!' : 'Share link'}
+              </button>
+            )}
           </div>
         </div>
         <div className="flex gap-2 shrink-0">

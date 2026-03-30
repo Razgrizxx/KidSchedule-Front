@@ -119,6 +119,18 @@ export function useDeleteOrg() {
   })
 }
 
+export function useUpdateOrg() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, ...body }: { orgId: string; isPublic?: boolean }) =>
+      api.patch(`/organizations/${orgId}`, body).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: orgKeys.detail(vars.orgId) })
+      void qc.invalidateQueries({ queryKey: orgKeys.mine })
+    },
+  })
+}
+
 export function useCreateOrgEvent() {
   const qc = useQueryClient()
   return useMutation({

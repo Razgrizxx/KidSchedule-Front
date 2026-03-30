@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api'
-import type { Organization, OrgEvent, OrgType, OrgRole } from '@/types/api'
+import type { Organization, OrgCustomRole, OrgEvent, OrgType, OrgRole } from '@/types/api'
 
 export const orgKeys = {
   mine: ['organizations', 'mine'] as const,
@@ -11,6 +11,7 @@ export const orgKeys = {
   announcements: (id: string) => ['organizations', id, 'announcements'] as const,
   venues: (id: string) => ['organizations', id, 'venues'] as const,
   rsvps: (id: string, eventId: string) => ['organizations', id, 'events', eventId, 'rsvp'] as const,
+  roles: (id: string) => ['organizations', id, 'roles'] as const,
 }
 
 // ── Queries ────────────────────────────────────────────────────────────────
@@ -116,6 +117,14 @@ export function useDeleteOrg() {
     mutationFn: (orgId: string) =>
       api.delete(`/organizations/${orgId}`).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: orgKeys.mine }),
+  })
+}
+
+export function useOrgCustomRoles(orgId?: string) {
+  return useQuery<OrgCustomRole[]>({
+    queryKey: orgKeys.roles(orgId!),
+    queryFn: () => api.get(`/organizations/${orgId}/roles`).then((r) => r.data),
+    enabled: !!orgId,
   })
 }
 
@@ -256,5 +265,55 @@ export function useDeleteAnnouncement() {
     mutationFn: ({ orgId, announcementId }: { orgId: string; announcementId: string }) =>
       api.delete(`/organizations/${orgId}/announcements/${announcementId}`).then((r) => r.data),
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.announcements(vars.orgId) }),
+  })
+}
+
+export function useCreateCustomRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, ...body }: {
+      orgId: string; name: string
+      canCreateEvents?: boolean; canCreateAnnouncements?: boolean; canCreateVenues?: boolean
+    }) => api.post(`/organizations/${orgId}/roles`, body).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: orgKeys.roles(vars.orgId) })
+      void qc.invalidateQueries({ queryKey: orgKeys.detail(vars.orgId) })
+    },
+  })
+}
+
+export function useUpdateCustomRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, roleId, ...body }: {
+      orgId: string; roleId: string; name?: string
+      canCreateEvents?: boolean; canCreateAnnouncements?: boolean; canCreateVenues?: boolean
+    }) => api.patch(`/organizations/${orgId}/roles/${roleId}`, body).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: orgKeys.roles(vars.orgId) })
+      void qc.invalidateQueries({ queryKey: orgKeys.detail(vars.orgId) })
+    },
+  })
+}
+
+export function useDeleteCustomRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, roleId }: { orgId: string; roleId: string }) =>
+      api.delete(`/organizations/${orgId}/roles/${roleId}`).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: orgKeys.roles(vars.orgId) })
+      void qc.invalidateQueries({ queryKey: orgKeys.detail(vars.orgId) })
+    },
+  })
+}
+
+export function useAssignCustomRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, userId, customRoleId }: {
+      orgId: string; userId: string; customRoleId: string | null
+    }) => api.patch(`/organizations/${orgId}/members/${userId}/custom-role`, { customRoleId }).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.detail(vars.orgId) }),
   })
 }

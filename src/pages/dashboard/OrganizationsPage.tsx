@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   School, Trophy, Copy, Check, Trash2, UserMinus, CalendarPlus, Loader2,
   Crown, MapPin, Megaphone, Pin, UserCheck, UserX, Download, Globe,
-  Lock, Search, ChevronDown, Plus, CalendarDays, Link2,
+  Lock, Search, ChevronDown, Plus, CalendarDays, Link2, ShieldCheck,
 } from 'lucide-react'
 import {
   useOrganization, useDeleteOrg, useLeaveOrg, useUpdateOrg,
@@ -12,6 +12,7 @@ import {
   useCreateVenue, useDeleteVenue, useOrgVenues,
   useCreateAnnouncement, useDeleteAnnouncement, useOrgAnnouncements,
   useUpsertRsvp, useBulkCreateOrgEvents,
+  useCreateCustomRole, useUpdateCustomRole, useDeleteCustomRole, useAssignCustomRole,
 } from '@/hooks/useOrganizations'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/hooks/use-toast'
@@ -24,7 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import type { OrgEvent, OrgMember, OrgRole, Venue, Announcement } from '@/types/api'
+import type { OrgCustomRole, OrgEvent, OrgMember, OrgRole, Venue, Announcement } from '@/types/api'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -476,6 +477,10 @@ export function OrganizationsPage() {
 
   const isManager = ['OWNER', 'ADMIN'].includes(org.myRole ?? org.role)
   const isPending = org.myStatus === 'PENDING'
+  const myCustomRole = org.myCustomRole
+  const canCreateEvents = isManager || !!myCustomRole?.canCreateEvents
+  const canCreateAnnouncements = isManager || !!myCustomRole?.canCreateAnnouncements
+  const canCreateVenues = isManager || !!myCustomRole?.canCreateVenues
 
   const activeMembers = org.members?.filter((m) => m.status === 'ACTIVE') ?? []
   const pendingMembers = org.members?.filter((m) => m.status === 'PENDING') ?? []
@@ -670,11 +675,16 @@ export function OrganizationsPage() {
           <TabsTrigger value="announcements" className="flex-1">
             <Megaphone className="w-3.5 h-3.5 mr-1.5" /> Posts
           </TabsTrigger>
+          {isManager && (
+            <TabsTrigger value="roles" className="flex-1">
+              <ShieldCheck className="w-3.5 h-3.5 mr-1.5" /> Roles
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* ── Events tab ── */}
         <TabsContent value="events" className="space-y-3 mt-4">
-          {isManager && (
+          {canCreateEvents && (
             <div className="flex gap-2">
               <Button size="sm" onClick={() => setAddEventOpen(true)}>
                 <CalendarPlus className="w-3.5 h-3.5 mr-1.5" /> Add Event
@@ -722,6 +732,7 @@ export function OrganizationsPage() {
                 isSelf={m.userId === user?.id}
                 orgId={org.id}
                 onRemove={() => removeM.mutate({ orgId: org.id, userId: m.userId })}
+                customRoles={(org.customRoles ?? []) as OrgCustomRole[]}
               />
             ))}
             {filteredMembers.length === 0 && (
@@ -737,7 +748,7 @@ export function OrganizationsPage() {
 
         {/* ── Venues tab ── */}
         <TabsContent value="venues" className="space-y-3 mt-4">
-          {isManager && (
+          {canCreateVenues && (
             <Button size="sm" onClick={() => setAddVenueOpen(true)}>
               <MapPin className="w-3.5 h-3.5 mr-1.5" /> Add Venue
             </Button>
@@ -777,7 +788,7 @@ export function OrganizationsPage() {
 
         {/* ── Announcements tab ── */}
         <TabsContent value="announcements" className="space-y-3 mt-4">
-          {isManager && !composingAnnouncement && (
+          {canCreateAnnouncements && !composingAnnouncement && (
             <Button size="sm" onClick={() => setComposingAnnouncement(true)}>
               <Megaphone className="w-3.5 h-3.5 mr-1.5" /> New Announcement
             </Button>
@@ -811,6 +822,13 @@ export function OrganizationsPage() {
             ))}
           </div>
         </TabsContent>
+
+        {/* ── Roles tab ── */}
+        {isManager && (
+          <TabsContent value="roles" className="mt-4">
+            <CustomRolesTab orgId={org.id} customRoles={(org.customRoles ?? []) as OrgCustomRole[]} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Modals */}
@@ -823,11 +841,14 @@ export function OrganizationsPage() {
 
 // ── Member Row ─────────────────────────────────────────────────────────────
 
-function MemberRow({ member, isManager, isSelf, orgId, onRemove }: {
-  member: OrgMember; isManager: boolean; isSelf: boolean; orgId: string; onRemove: () => void
+function MemberRow({ member, isManager, isSelf, orgId, onRemove, customRoles }: {
+  member: OrgMember; isManager: boolean; isSelf: boolean; orgId: string
+  onRemove: () => void; customRoles: OrgCustomRole[]
 }) {
   const updateRole = useUpdateMemberRole()
+  const assignCustomRole = useAssignCustomRole()
   const [showRoles, setShowRoles] = useState(false)
+  const [showCustomRoles, setShowCustomRoles] = useState(false)
   const roles: OrgRole[] = ['MEMBER', 'VOLUNTEER', 'ADMIN']
 
   return (
@@ -843,25 +864,62 @@ function MemberRow({ member, isManager, isSelf, orgId, onRemove }: {
         <p className="text-xs text-slate-400 truncate">{member.user.email}</p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
+        {member.customRole && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 font-medium border border-violet-100 truncate max-w-[80px]">
+            {member.customRole.name}
+          </span>
+        )}
         {isManager && !isSelf ? (
-          <div className="relative">
-            <button
-              onClick={() => setShowRoles((v) => !v)}
-              className={cn('text-[11px] px-2 py-0.5 rounded-full font-semibold', ROLE_BADGE[member.role])}
-            >
-              {member.role} ▾
-            </button>
-            {showRoles && (
-              <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-10 overflow-hidden">
-                {roles.map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => { updateRole.mutate({ orgId, userId: member.userId, role: r }); setShowRoles(false) }}
-                    className="block w-full text-left px-4 py-2 text-xs hover:bg-slate-50"
-                  >
-                    {r}
-                  </button>
-                ))}
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <button
+                onClick={() => setShowRoles((v) => !v)}
+                className={cn('text-[11px] px-2 py-0.5 rounded-full font-semibold', ROLE_BADGE[member.role])}
+              >
+                {member.role} ▾
+              </button>
+              {showRoles && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-10 overflow-hidden">
+                  {roles.map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => { updateRole.mutate({ orgId, userId: member.userId, role: r }); setShowRoles(false) }}
+                      className="block w-full text-left px-4 py-2 text-xs hover:bg-slate-50"
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {customRoles.length > 0 && member.role !== 'OWNER' && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowCustomRoles((v) => !v)}
+                  className="p-1 text-slate-300 hover:text-violet-500 transition-colors"
+                  title="Assign custom role"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </button>
+                {showCustomRoles && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-10 overflow-hidden min-w-[140px]">
+                    <button
+                      onClick={() => { assignCustomRole.mutate({ orgId, userId: member.userId, customRoleId: null }); setShowCustomRoles(false) }}
+                      className="block w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-400"
+                    >
+                      None
+                    </button>
+                    {customRoles.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => { assignCustomRole.mutate({ orgId, userId: member.userId, customRoleId: r.id }); setShowCustomRoles(false) }}
+                        className={cn('block w-full text-left px-4 py-2 text-xs hover:bg-violet-50', member.customRole?.id === r.id ? 'text-violet-600 font-semibold' : '')}
+                      >
+                        {r.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -875,6 +933,155 @@ function MemberRow({ member, isManager, isSelf, orgId, onRemove }: {
             <UserX className="w-3.5 h-3.5" />
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── Custom Roles Tab ────────────────────────────────────────────────────────
+
+const PERM_LABELS = [
+  { key: 'canCreateEvents' as const, label: 'Create events' },
+  { key: 'canCreateAnnouncements' as const, label: 'Create announcements' },
+  { key: 'canCreateVenues' as const, label: 'Create venues' },
+]
+
+function CustomRolesTab({ orgId, customRoles }: { orgId: string; customRoles: OrgCustomRole[] }) {
+  const createRole = useCreateCustomRole()
+  const updateRole = useUpdateCustomRole()
+  const deleteRole = useDeleteCustomRole()
+
+  const [newName, setNewName] = useState('')
+  const [newPerms, setNewPerms] = useState({ canCreateEvents: false, canCreateAnnouncements: false, canCreateVenues: false })
+  const [creating, setCreating] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPerms, setEditPerms] = useState({ canCreateEvents: false, canCreateAnnouncements: false, canCreateVenues: false })
+
+  function startEdit(role: OrgCustomRole) {
+    setEditingId(role.id)
+    setEditName(role.name)
+    setEditPerms({ canCreateEvents: role.canCreateEvents, canCreateAnnouncements: role.canCreateAnnouncements, canCreateVenues: role.canCreateVenues })
+  }
+
+  function handleCreate() {
+    if (!newName.trim()) return
+    createRole.mutate({ orgId, name: newName.trim(), ...newPerms }, {
+      onSuccess: () => {
+        setNewName('')
+        setNewPerms({ canCreateEvents: false, canCreateAnnouncements: false, canCreateVenues: false })
+        setCreating(false)
+      },
+    })
+  }
+
+  function handleUpdate() {
+    if (!editingId || !editName.trim()) return
+    updateRole.mutate({ orgId, roleId: editingId, name: editName.trim(), ...editPerms }, {
+      onSuccess: () => setEditingId(null),
+    })
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-400">Custom roles let you grant specific permissions to members beyond their base role.</p>
+        {!creating && (
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus className="w-3.5 h-3.5 mr-1.5" /> New Role
+          </Button>
+        )}
+      </div>
+
+      {creating && (
+        <div className="bg-white border border-violet-100 rounded-2xl p-4 space-y-3">
+          <Input
+            placeholder="Role name (e.g. Coach, Coordinator)"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            autoFocus
+          />
+          <div className="space-y-2">
+            {PERM_LABELS.map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newPerms[key]}
+                  onChange={(e) => setNewPerms((p) => ({ ...p, [key]: e.target.checked }))}
+                  className="rounded"
+                />
+                <span className="text-sm text-slate-700">{label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleCreate} disabled={!newName.trim() || createRole.isPending}>Create</Button>
+            <Button size="sm" variant="ghost" onClick={() => setCreating(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {customRoles.length === 0 && !creating && (
+        <p className="text-sm text-slate-400 text-center py-8">No custom roles yet.</p>
+      )}
+
+      <div className="space-y-2">
+        {customRoles.map((role) => (
+          <div key={role.id} className="bg-white border border-slate-100 rounded-2xl p-4">
+            {editingId === role.id ? (
+              <div className="space-y-3">
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
+                <div className="space-y-2">
+                  {PERM_LABELS.map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editPerms[key]}
+                        onChange={(e) => setEditPerms((p) => ({ ...p, [key]: e.target.checked }))}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-slate-700">{label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleUpdate} disabled={!editName.trim() || updateRole.isPending}>Save</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-violet-700">{role.name}</span>
+                    {role._count && (
+                      <span className="text-xs text-slate-400">{role._count.members} member{role._count.members !== 1 ? 's' : ''}</span>
+                    )}
+                  </div>
+                  <div className="flex gap-3 mt-1.5 flex-wrap">
+                    {PERM_LABELS.map(({ key, label }) => (
+                      <span key={key} className={cn('text-xs flex items-center gap-1', role[key] ? 'text-teal-600' : 'text-slate-300')}>
+                        {role[key] ? '✓' : '✗'} {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => startEdit(role)} className="p-1 text-slate-400 hover:text-violet-500 transition-colors">
+                    <ChevronDown className="w-3.5 h-3.5 rotate-[-90deg]" />
+                  </button>
+                  <button
+                    onClick={() => deleteRole.mutate({ orgId, roleId: role.id })}
+                    disabled={deleteRole.isPending}
+                    className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )

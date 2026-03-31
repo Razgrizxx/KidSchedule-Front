@@ -3,6 +3,20 @@ import api from '@/api'
 import type { FamilySettings, UserSettings } from '@/types/api'
 import { useAuthStore } from '@/store/authStore'
 
+export function useUploadAvatar() {
+  const setAvatarUrl = useAuthStore((s) => s.setAvatarUrl)
+  return useMutation({
+    mutationFn: (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return api.post<{ avatarUrl: string }>('/users/me/avatar', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data)
+    },
+    onSuccess: ({ avatarUrl }) => setAvatarUrl(avatarUrl),
+  })
+}
+
 // ── Phone verification ────────────────────────────────────────────────────────
 
 export function useSendPhoneCode() {

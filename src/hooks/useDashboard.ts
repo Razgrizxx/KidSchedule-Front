@@ -137,3 +137,25 @@ export function useRemoveCaregiver(familyId: string) {
     },
   })
 }
+
+export function useAssignCaregiverToChild(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ caregiverId, childId }: { caregiverId: string; childId: string }) =>
+      api.post(`/families/${familyId}/caregivers/${caregiverId}/assign/${childId}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['caregivers', familyId] })
+    },
+  })
+}
+
+export function useUnassignCaregiverFromChild(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ caregiverId, childId }: { caregiverId: string; childId: string }) =>
+      api.delete(`/families/${familyId}/caregivers/${caregiverId}/assign/${childId}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['caregivers', familyId] })
+    },
+  })
+}

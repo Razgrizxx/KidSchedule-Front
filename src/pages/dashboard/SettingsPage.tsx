@@ -181,7 +181,7 @@ const PLAN_META: Record<PlanType, {
   FREE: {
     label: 'Free',
     icon: <Star className="w-4 h-4" />,
-    gradient: 'from-slate-100 to-slate-200',
+    gradient: 'from-slate-500 to-slate-700',
     textColor: 'text-slate-600',
     badgeClass: 'bg-slate-100 text-slate-600',
     perks: ['1 child profile', 'Basic calendar', 'Secure messaging', 'Up to 5 moments'],

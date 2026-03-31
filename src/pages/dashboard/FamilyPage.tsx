@@ -31,6 +31,8 @@ import {
   useInviteMember,
   useUpdateCaregiver,
   useRemoveCaregiver,
+  useAssignCaregiverToChild,
+  useUnassignCaregiverFromChild,
   type CreateChildDto,
   type UpdateCaregiverDto,
 } from '@/hooks/useDashboard'
@@ -121,52 +123,119 @@ function MemberRow({ member, isMe }: { member: FamilyMember; isMe: boolean }) {
 
 function CaregiverRow({
   caregiver,
+  allChildren,
+  familyId,
   onEdit,
   onDelete,
 }: {
   caregiver: Caregiver
+  allChildren: Child[]
+  familyId: string
   onEdit: (c: Caregiver) => void
   onDelete: (c: Caregiver) => void
 }) {
   const initials = caregiver.name.slice(0, 2).toUpperCase()
+  const [showAssign, setShowAssign] = useState(false)
+  const assign = useAssignCaregiverToChild(familyId)
+  const unassign = useUnassignCaregiverFromChild(familyId)
+
+  const assignedIds = new Set(caregiver.children?.map((cc) => cc.child.id) ?? [])
+  const assignedChildren = caregiver.children?.map((cc) => cc.child) ?? []
+  const unassignedChildren = allChildren.filter((c) => !assignedIds.has(c.id))
+
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0 group">
-      <Avatar className="h-9 w-9 shrink-0">
-        <AvatarFallback className="text-xs bg-purple-50 text-purple-600">{initials}</AvatarFallback>
-      </Avatar>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-slate-800">{caregiver.name}</p>
-        <p className="text-xs text-slate-400">
-          {caregiver.relationship ?? 'Caregiver'}
-          {caregiver.email && ` · ${caregiver.email}`}
-        </p>
+    <div className="py-3 border-b border-slate-50 last:border-0">
+      <div className="flex items-center gap-3 group">
+        <Avatar className="h-9 w-9 shrink-0">
+          <AvatarFallback className="text-xs bg-purple-50 text-purple-600">{initials}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-slate-800">{caregiver.name}</p>
+          <p className="text-xs text-slate-400">
+            {caregiver.relationship ?? 'Caregiver'}
+            {caregiver.email && ` · ${caregiver.email}`}
+          </p>
+        </div>
+        {caregiver.visibility === 'SHARED' ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-600 shrink-0">
+            <Share2 className="w-3 h-3" />
+            Shared
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">
+            <Lock className="w-3 h-3" />
+            Private
+          </span>
+        )}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <button
+            onClick={() => onEdit(caregiver)}
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            title="Edit"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => onDelete(caregiver)}
+            className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+            title="Delete"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
-      {caregiver.visibility === 'SHARED' ? (
-        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-600 shrink-0">
-          <Share2 className="w-3 h-3" />
-          Shared
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">
-          <Lock className="w-3 h-3" />
-          Private
-        </span>
-      )}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button
-          onClick={() => onEdit(caregiver)}
-          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-          title="Edit"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => onDelete(caregiver)}
-          className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-          title="Delete"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
+
+      {/* Assigned children */}
+      <div className="ml-12 mt-2 flex flex-wrap items-center gap-1.5">
+        {assignedChildren.map((child) => (
+          <span
+            key={child.id}
+            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
+            style={{ backgroundColor: child.color + '22', color: child.color }}
+          >
+            {child.firstName}
+            <button
+              onClick={() => unassign.mutate({ caregiverId: caregiver.id, childId: child.id })}
+              className="hover:opacity-70 transition-opacity ml-0.5"
+              title={`Remove ${child.firstName}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        {unassignedChildren.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => setShowAssign((v) => !v)}
+              className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-teal-400 hover:text-teal-600 transition-colors"
+            >
+              <Plus className="w-3 h-3" /> Assign child
+            </button>
+            {showAssign && (
+              <div className="absolute left-0 top-full mt-1 z-10 bg-white rounded-xl border border-slate-100 shadow-md py-1 min-w-[140px]">
+                {unassignedChildren.map((child) => (
+                  <button
+                    key={child.id}
+                    onClick={() => {
+                      assign.mutate({ caregiverId: caregiver.id, childId: child.id })
+                      setShowAssign(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-slate-50 transition-colors"
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: child.color }}
+                    />
+                    {child.firstName} {child.lastName}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {assignedChildren.length === 0 && unassignedChildren.length === 0 && (
+          <span className="text-xs text-slate-300">No children in family</span>
+        )}
       </div>
     </div>
   )
@@ -463,6 +532,8 @@ export function FamilyPage() {
               <CaregiverRow
                 key={c.id}
                 caregiver={c}
+                allChildren={children ?? []}
+                familyId={familyId}
                 onEdit={openEdit}
                 onDelete={setDeletingCaregiver}
               />
@@ -500,6 +571,7 @@ export function FamilyPage() {
               <Label>Date of Birth</Label>
               <Input
                 type="date"
+                max={new Date().toISOString().split('T')[0]}
                 value={childForm.dateOfBirth}
                 onChange={(e) => setChildForm((f) => ({ ...f, dateOfBirth: e.target.value }))}
               />

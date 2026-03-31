@@ -158,6 +158,7 @@ export interface Caregiver {
   linkExpiresAt?: string
   createdAt: string
   updatedAt: string
+  children?: { child: Child }[]
 }
 
 export type EventType = 'CUSTODY_TIME' | 'SCHOOL' | 'MEDICAL' | 'ACTIVITY' | 'VACATION' | 'OTHER'

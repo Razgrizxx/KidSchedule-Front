@@ -29,6 +29,7 @@ import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/hooks/use-toast'
 import type { MediationSession, MediationMessage, ResolutionProposal } from '@/types/api'
 import { cn } from '@/lib/utils'
+import ReactMarkdown from 'react-markdown'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -401,8 +402,22 @@ function ChatMessage({
         </div>
         <div>
           <div className="text-xs text-slate-400 mb-1">AI Mediator · {fmtTime(message.createdAt)}</div>
-          <div className="bg-teal-50 border border-teal-100 rounded-2xl rounded-tl-sm px-3 py-2 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-            {message.content}
+          <div className="bg-teal-50 border border-teal-100 rounded-2xl rounded-tl-sm px-3 py-2 text-sm text-slate-700 leading-relaxed">
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                ul: ({ children }) => <ul className="list-disc pl-4 mb-1 space-y-0.5">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal pl-4 mb-1 space-y-0.5">{children}</ol>,
+                li: ({ children }) => <li>{children}</li>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                em: ({ children }) => <em className="italic">{children}</em>,
+                h1: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
+                h2: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
+                h3: ({ children }) => <p className="font-medium mb-0.5">{children}</p>,
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
           </div>
         </div>
       </div>

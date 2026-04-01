@@ -69,6 +69,7 @@ interface CreateEventDto {
   repeat: RepeatPattern
   notes?: string
   assignedToId?: string
+  caregiverId?: string
   childIds: string[]
 }
 

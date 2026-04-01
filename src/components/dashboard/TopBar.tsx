@@ -5,7 +5,7 @@ import {
   Menu, Bell, Crown, Zap, MessageSquare, ClipboardList,
   Users, Scale, DollarSign, X,
 } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuthStore } from '@/store/authStore'
 import { useSubscription, type PlanType } from '@/hooks/useSubscription'
 import { useNotifications, type NotificationType } from '@/hooks/useNotifications'
@@ -236,6 +236,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
             <p className="text-xs text-slate-400 mt-0.5">{user?.email}</p>
           </div>
           <Avatar className="h-8 w-8">
+            {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.firstName} />}
             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
           </Avatar>
         </div>

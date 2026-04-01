@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useFamilies, useChildren } from '@/hooks/useDashboard'
+import { useFamilies, useChildren, useCaregivers } from '@/hooks/useDashboard'
 import { useSchedules, useCreateSchedule } from '@/hooks/useCalendar'
 import { useGoogleStatus, useGoogleAuthUrl, useExportCalendar } from '@/hooks/useSettings'
 import { toast } from '@/hooks/use-toast'
@@ -109,6 +109,7 @@ export function CalendarPage() {
   const family = families?.[0]
   const familyId = family?.id
   const { data: children, isLoading: childrenLoading } = useChildren(familyId)
+  const { data: caregivers } = useCaregivers(familyId)
   const { data: schedules } = useSchedules(familyId)
   const createSchedule = useCreateSchedule()
 
@@ -470,6 +471,7 @@ export function CalendarPage() {
           familyId={familyId}
           children={children}
           parents={parents}
+          caregivers={caregivers}
           defaultDate={addEventDate}
           editEvent={editingEvent ?? undefined}
         />

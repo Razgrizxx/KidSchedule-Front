@@ -8,12 +8,14 @@ import {
   Lock,
   AlertCircle,
   LogOut,
+  ClipboardList,
+  RepeatIcon,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/store/authStore'
-import { useCaregiverDashboard } from '@/hooks/useCaregiverPortal'
+import { useCaregiverDashboard, type AssignedEventSlim } from '@/hooks/useCaregiverPortal'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -126,6 +128,100 @@ function AccessDeniedCard({ label }: { label: string }) {
   )
 }
 
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  CUSTODY_TIME: 'Custody',
+  SCHOOL: 'School',
+  MEDICAL: 'Medical',
+  ACTIVITY: 'Activity',
+  VACATION: 'Vacation',
+  OTHER: 'Other',
+}
+
+const EVENT_TYPE_COLORS: Record<string, string> = {
+  CUSTODY_TIME: 'bg-teal-50 text-teal-600',
+  SCHOOL: 'bg-blue-50 text-blue-600',
+  MEDICAL: 'bg-red-50 text-red-500',
+  ACTIVITY: 'bg-amber-50 text-amber-600',
+  VACATION: 'bg-purple-50 text-purple-600',
+  OTHER: 'bg-slate-100 text-slate-500',
+}
+
+function formatEventDate(startAt: string, endAt: string, allDay: boolean): string {
+  const start = new Date(startAt)
+  const end = new Date(endAt)
+  const dateStr = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  if (allDay) return dateStr
+  const startTime = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  const endTime = end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  return `${dateStr} · ${startTime} – ${endTime}`
+}
+
+function AssignedEventsSection({ events, isLoading }: { events: AssignedEventSlim[]; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-16 w-full rounded-xl" />
+        <Skeleton className="h-16 w-full rounded-xl" />
+      </div>
+    )
+  }
+  if (!events.length) {
+    return (
+      <div className="text-center py-8">
+        <ClipboardList className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+        <p className="text-sm text-slate-400">No upcoming activities assigned to you.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-2">
+      {events.map((ev) => (
+        <div
+          key={ev.id}
+          className="flex items-start gap-3 p-3.5 rounded-xl bg-purple-50 border border-purple-100"
+        >
+          <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0 border border-purple-100">
+            <ClipboardList className="w-4 h-4 text-purple-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-semibold text-slate-800">{ev.title}</p>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${EVENT_TYPE_COLORS[ev.type] ?? 'bg-slate-100 text-slate-500'}`}>
+                {EVENT_TYPE_LABELS[ev.type] ?? ev.type}
+              </span>
+              {ev.repeat !== 'NONE' && (
+                <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
+                  <RepeatIcon className="w-3 h-3" />
+                  Recurring
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {formatEventDate(ev.startAt, ev.endAt, ev.allDay)}
+            </p>
+            {ev.children.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                {ev.children.map(({ child }) => (
+                  <span
+                    key={child.id}
+                    className="text-[11px] font-medium px-2 py-0.5 rounded-full text-white"
+                    style={{ backgroundColor: child.color }}
+                  >
+                    {child.firstName}
+                  </span>
+                ))}
+              </div>
+            )}
+            {ev.notes && (
+              <p className="text-xs text-slate-400 mt-1 italic">{ev.notes}</p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Main view ─────────────────────────────────────────────────────────────────
 
 export function CaregiverDashboardView() {
@@ -187,6 +283,27 @@ export function CaregiverDashboardView() {
 
         {/* 2-column grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+          {/* Assigned Activities */}
+          <Card className="md:col-span-2 rounded-2xl border-purple-100 shadow-sm bg-white">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 flex items-center justify-center">
+                  <ClipboardList className="w-4 h-4 text-purple-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">My Activities</CardTitle>
+                  <p className="text-xs text-slate-400 mt-0.5">Events assigned to you — next 3 months</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <AssignedEventsSection
+                events={data?.assignedEvents ?? []}
+                isLoading={isLoading}
+              />
+            </CardContent>
+          </Card>
 
           {/* Calendar */}
           <Card className="md:col-span-2 rounded-2xl border-slate-100 shadow-sm">

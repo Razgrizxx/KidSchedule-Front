@@ -179,6 +179,8 @@ export interface CalendarEvent {
   notes?: string
   assignedToId?: string
   assignedTo?: { id: string; firstName: string; lastName: string }
+  caregiverId?: string
+  caregiver?: { id: string; name: string }
   children: { child: { id: string; firstName: string; lastName: string; color: string } }[]
   createdAt: string
 }

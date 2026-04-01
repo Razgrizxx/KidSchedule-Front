@@ -54,6 +54,34 @@ export function useAddChild(familyId: string) {
   })
 }
 
+export type UpdateChildDto = Partial<CreateChildDto>
+
+export function useUpdateChild(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...dto }: UpdateChildDto & { id: string }) =>
+      api.patch(`/families/${familyId}/children/${id}`, dto).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['children', familyId] })
+      void qc.invalidateQueries({ queryKey: ['family', familyId] })
+      void qc.invalidateQueries({ queryKey: ['families'] })
+    },
+  })
+}
+
+export function useDeleteChild(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (childId: string) =>
+      api.delete(`/families/${familyId}/children/${childId}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['children', familyId] })
+      void qc.invalidateQueries({ queryKey: ['family', familyId] })
+      void qc.invalidateQueries({ queryKey: ['families'] })
+    },
+  })
+}
+
 export function useInviteMember(familyId: string) {
   const qc = useQueryClient()
   return useMutation({

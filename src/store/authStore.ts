@@ -7,7 +7,9 @@ export interface AuthUser {
   firstName: string
   lastName: string
   email: string
+  phone?: string | null
   isVerified: boolean
+  avatarUrl?: string | null
 }
 
 export interface CaregiverData {
@@ -45,6 +47,7 @@ interface AuthState {
   clearCaregiverAccess: () => void
   setAppearance: (appearance: AppearanceTheme) => void
   setTimeFormat: (timeFormat: TimeFormat) => void
+  setAvatarUrl: (avatarUrl: string) => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -80,6 +83,8 @@ export const useAuthStore = create<AuthState>()(
 
       setAppearance: (appearance) => set({ appearance }),
       setTimeFormat: (timeFormat) => set({ timeFormat }),
+      setAvatarUrl: (avatarUrl) =>
+        set((s) => ({ user: s.user ? { ...s.user, avatarUrl } : s.user })),
     }),
     { name: 'kidschedule-auth' },
   ),

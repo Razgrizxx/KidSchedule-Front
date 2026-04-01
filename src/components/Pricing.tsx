@@ -112,7 +112,7 @@ export function Pricing() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
           {plans.map((plan, index) => (
             <motion.div
               key={plan.id}
@@ -120,7 +120,7 @@ export function Pricing() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="relative"
+              className="relative h-full"
             >
               <Card
                 className={`h-full flex flex-col ${
@@ -137,7 +137,7 @@ export function Pricing() {
                   </div>
                 )}
 
-                <CardHeader className={`pb-4 ${plan.popular ? 'pt-8' : 'pt-6'}`}>
+                <CardHeader className="pb-4 pt-8">
                   <div className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">
                     {plan.name}
                   </div>

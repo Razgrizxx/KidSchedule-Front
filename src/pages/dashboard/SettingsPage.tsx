@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Globe, Calendar, Bell, Paintbrush, Check, Link2, Link2Off, RefreshCw, Loader2, CreditCard, Crown, Zap, Star, ExternalLink, Lock } from 'lucide-react'
+import { Globe, Calendar, Bell, Paintbrush, Check, Link2, Link2Off, RefreshCw, Loader2, CreditCard, Crown, Zap, Star, ExternalLink, Lock, Phone, BadgeCheck, Pencil, Upload, User } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
@@ -18,8 +19,13 @@ import {
   useGoogleAuthUrl,
   useGoogleDisconnect,
   useGoogleSync,
+  useSendPhoneCode,
+  useVerifyPhone,
+  useUploadAvatar,
 } from '@/hooks/useSettings'
 import { useSubscription, useCreatePortal, type PlanType } from '@/hooks/useSubscription'
+import { Input } from '@/components/ui/input'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 import { useQueryClient } from '@tanstack/react-query'
 import { UpgradeModal } from '@/components/FeatureGate'
 import { useAuthStore } from '@/store/authStore'
@@ -177,7 +183,7 @@ const PLAN_META: Record<PlanType, {
   FREE: {
     label: 'Free',
     icon: <Star className="w-4 h-4" />,
-    gradient: 'from-slate-100 to-slate-200',
+    gradient: 'from-slate-500 to-slate-700',
     textColor: 'text-slate-600',
     badgeClass: 'bg-slate-100 text-slate-600',
     perks: ['1 child profile', 'Basic calendar', 'Secure messaging', 'Up to 5 moments'],
@@ -206,6 +212,78 @@ const PLAN_META: Record<PlanType, {
     badgeClass: 'bg-purple-100 text-purple-700',
     perks: ['Unlimited child profiles', 'Everything in Plus', 'Priority support', 'Advanced analytics'],
   },
+}
+
+// ─── Profile card ─────────────────────────────────────────────────────────────
+
+function ProfileCard() {
+  const user = useAuthStore((s) => s.user)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const upload = useUploadAvatar()
+
+  const initials = user
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    : 'US'
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    upload.mutate(file, {
+      onSuccess: () => toast({ title: 'Profile photo updated', variant: 'success' }),
+      onError: (err) => toast({ title: 'Upload failed', description: getErrorMessage(err), variant: 'error' }),
+    })
+    e.target.value = ''
+  }
+
+  return (
+    <Card>
+      <SectionHeader
+        icon={User}
+        title="Profile"
+        description="Your account information"
+        saved={false}
+      />
+      <CardContent className="pt-2">
+        <div className="flex items-center gap-4">
+          <div className="relative group">
+            <Avatar className="h-16 w-16">
+              {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.firstName} />}
+              <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+            </Avatar>
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={upload.isPending}
+              className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              {upload.isPending
+                ? <Loader2 className="w-5 h-5 text-white animate-spin" />
+                : <Upload className="w-5 h-5 text-white" />}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFile}
+            />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-800">
+              {user ? `${user.firstName} ${user.lastName}` : '—'}
+            </p>
+            <p className="text-xs text-slate-400">{user?.email}</p>
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={upload.isPending}
+              className="text-xs text-teal-600 hover:underline mt-1 disabled:opacity-50"
+            >
+              {user?.avatarUrl ? 'Change photo' : 'Upload photo'}
+            </button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 // ─── Subscription card ────────────────────────────────────────────────────────
@@ -490,6 +568,9 @@ export function SettingsPage() {
         <h2 className="text-xl font-bold text-slate-800">Settings</h2>
         <p className="text-sm text-slate-400">Changes save automatically</p>
       </div>
+
+      {/* ── Profile ──────────────────────────────────────────────────────── */}
+      <ProfileCard />
 
       {/* ── Subscription & Billing ───────────────────────────────────────── */}
       <SubscriptionCard justPurchased={justPurchased} />
@@ -797,7 +878,142 @@ export function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Phone Verification ───────────────────────────────────────────── */}
+      <PhoneVerificationCard />
     </div>
+  )
+}
+
+// ─── Phone Verification Card ──────────────────────────────────────────────────
+
+function PhoneVerificationCard() {
+  const user = useAuthStore((s) => s.user)
+  const sendCode = useSendPhoneCode()
+  const verifyPhone = useVerifyPhone()
+
+  const [phone, setPhone] = useState(user?.phone ?? '')
+  const [code, setCode] = useState('')
+  const [codeSent, setCodeSent] = useState(false)
+  const [changing, setChanging] = useState(false)
+
+  const isVerified = !!user?.isVerified && !changing
+
+  async function handleSend() {
+    if (!phone.trim()) return
+    try {
+      await sendCode.mutateAsync(phone.trim())
+      setCodeSent(true)
+      toast({ title: 'Verification code sent via SMS', variant: 'success' })
+    } catch (err) {
+      toast({ title: 'Failed to send code', description: getErrorMessage(err), variant: 'error' })
+    }
+  }
+
+  async function handleVerify() {
+    if (!code.trim()) return
+    try {
+      await verifyPhone.mutateAsync({ phone: phone.trim(), code: code.trim() })
+      setCode('')
+      setCodeSent(false)
+      setChanging(false)
+      toast({ title: 'Phone verified successfully', variant: 'success' })
+    } catch (err) {
+      toast({ title: 'Invalid or expired code', description: getErrorMessage(err), variant: 'error' })
+    }
+  }
+
+  function handleCancel() {
+    setChanging(false)
+    setCodeSent(false)
+    setCode('')
+    setPhone(user?.phone ?? '')
+  }
+
+  return (
+    <Card>
+      <SectionHeader
+        icon={Phone}
+        title="Phone Verification"
+        description="Required to access encrypted messaging"
+        saved={false}
+      />
+      <CardContent className="pt-2">
+        {isVerified ? (
+          <SettingRow>
+            <div>
+              <Label className="text-sm font-medium text-slate-700">Verified number</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-sm text-slate-600 font-mono">{user?.phone}</span>
+                <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                  <BadgeCheck className="w-3.5 h-3.5" /> Verified
+                </span>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setChanging(true)}>
+              <Pencil className="w-3.5 h-3.5 mr-1.5" /> Change
+            </Button>
+          </SettingRow>
+        ) : (
+          <div className="space-y-3 py-1">
+            {!codeSent ? (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="+54 9 11 XXXX-XXXX"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="max-w-xs"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleSend}
+                  disabled={!phone.trim() || sendCode.isPending}
+                >
+                  {sendCode.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Code'}
+                </Button>
+                {changing && (
+                  <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-500">
+                  Code sent via SMS to <span className="font-medium">{phone}</span>.{' '}
+                  <button className="text-teal-600 hover:underline" onClick={() => setCodeSent(false)}>
+                    Change number
+                  </button>
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="6-digit code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    maxLength={6}
+                    className="max-w-[140px] font-mono tracking-widest"
+                    onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleVerify}
+                    disabled={code.length < 6 || verifyPhone.isPending}
+                  >
+                    {verifyPhone.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify'}
+                  </Button>
+                  {changing && (
+                    <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
+                  )}
+                </div>
+              </div>
+            )}
+            {!changing && (
+              <p className="text-xs text-slate-400">
+                A verification code will be sent via SMS. Enter it below to unlock messaging.
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

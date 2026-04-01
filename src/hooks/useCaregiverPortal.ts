@@ -16,6 +16,18 @@ export interface ContactSlim {
   phone: string | null
 }
 
+export interface AssignedEventSlim {
+  id: string
+  title: string
+  type: string
+  startAt: string
+  endAt: string
+  allDay: boolean
+  repeat: string
+  notes?: string
+  children: { child: { id: string; firstName: string; lastName: string; color: string } }[]
+}
+
 export interface CaregiverDashboardData {
   name: string
   familyId: string | null
@@ -28,6 +40,7 @@ export interface CaregiverDashboardData {
   children: { id: string; firstName: string; lastName: string; color: string; dateOfBirth: string }[]
   custodyEvents: CustodyEventSlim[]
   contacts: ContactSlim[]
+  assignedEvents: AssignedEventSlim[]
 }
 
 export function useCaregiverDashboard() {

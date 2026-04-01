@@ -12,6 +12,7 @@ import { useMoments, useCreateMoment, useDeleteMoment, cloudinaryOptimized } fro
 import { useSubscription, canUseFeature, FREE_MOMENTS_LIMIT } from '@/hooks/useSubscription'
 import { UpgradeModal } from '@/components/FeatureGate'
 import { toast } from '@/hooks/use-toast'
+import { getErrorMessage } from '@/lib/getErrorMessage'
 import type { Moment } from '@/types/api'
 
 function initials(first?: string, last?: string) {
@@ -164,8 +165,8 @@ function NewMomentModal({ familyId, open, onClose }: { familyId: string; open: b
       await createMoment.mutateAsync(fd)
       toast({ title: 'Moment posted!', variant: 'success' })
       handleClose()
-    } catch {
-      toast({ title: 'Upload failed', variant: 'error' })
+    } catch (err) {
+      toast({ title: 'Upload failed', description: getErrorMessage(err), variant: 'error' })
     }
   }
 

@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCreateEvent, useUpdateEvent } from '@/hooks/useCalendar'
 import { toast } from '@/hooks/use-toast'
-import type { Child, FamilyMember, EventType, EventVisibility, RepeatPattern, CalendarEvent } from '@/types/api'
+import type { Child, FamilyMember, Caregiver, EventType, EventVisibility, RepeatPattern, CalendarEvent } from '@/types/api'
 import { getErrorMessage } from '@/lib/getErrorMessage'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ interface Props {
   familyId: string
   children: Child[]
   parents: FamilyMember[]
+  caregivers?: Caregiver[]
   /** Pre-fill the start date (YYYY-MM-DD) when opened by clicking a day */
   defaultDate?: string
   /** When provided, the modal acts as an editor for this event */
@@ -58,7 +59,7 @@ function todayStr() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function AddEventModal({ open, onClose, familyId, children, parents, defaultDate, editEvent }: Props) {
+export function AddEventModal({ open, onClose, familyId, children, parents, caregivers = [], defaultDate, editEvent }: Props) {
   const createEvent = useCreateEvent()
   const updateEvent = useUpdateEvent()
   const isEditing = !!editEvent
@@ -66,6 +67,7 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
   const [selectedChildIds, setSelectedChildIds] = useState<string[]>([])
   const [type, setType] = useState<EventType>('CUSTODY_TIME')
   const [assignedToId, setAssignedToId] = useState<string>('')
+  const [caregiverId, setCaregiverId] = useState<string>('')
   const [title, setTitle] = useState('Custody Time')
   const [visibility, setVisibility] = useState<EventVisibility>('SHARED')
   const [allDay, setAllDay] = useState(false)
@@ -82,6 +84,7 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
     if (editEvent) {
       setSelectedChildIds(editEvent.children.map((ec) => ec.child.id))
       setAssignedToId(editEvent.assignedToId ?? '')
+      setCaregiverId(editEvent.caregiverId ?? '')
       setType(editEvent.type)
       setTitle(editEvent.title)
       setVisibility(editEvent.visibility)
@@ -96,6 +99,7 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
       const date = defaultDate ?? todayStr()
       setSelectedChildIds(children.length > 0 ? [children[0].id] : [])
       setAssignedToId(parents[0]?.userId ?? '')
+      setCaregiverId('')
       setType('CUSTODY_TIME')
       setTitle('Custody Time')
       setVisibility('SHARED')
@@ -155,6 +159,7 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
         repeat,
         notes: notes || undefined,
         assignedToId: assignedToId || undefined,
+        caregiverId: caregiverId || undefined,
         childIds: selectedChildIds,
       }
       if (isEditing && editEvent) {
@@ -229,20 +234,48 @@ export function AddEventModal({ open, onClose, familyId, children, parents, defa
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Assign to Parent</Label>
-              <Select value={assignedToId} onValueChange={setAssignedToId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select parent…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {parents.map((m) => (
-                    <SelectItem key={m.userId} value={m.userId}>
-                      {m.user.firstName} {m.user.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Assign to Parent</Label>
+                <Select
+                  value={assignedToId || '__none__'}
+                  onValueChange={(v) => { const val = v === '__none__' ? '' : v; setAssignedToId(val); if (val) setCaregiverId('') }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select parent…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {parents.map((m) => (
+                      <SelectItem key={m.userId} value={m.userId}>
+                        {m.user.firstName} {m.user.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {caregivers.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Assign to Caregiver</Label>
+                  <Select
+                    value={caregiverId || '__none__'}
+                    onValueChange={(v) => { const val = v === '__none__' ? '' : v; setCaregiverId(val); if (val) setAssignedToId('') }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select caregiver…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {caregivers.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">

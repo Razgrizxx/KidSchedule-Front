@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import {
   Dialog,
@@ -332,6 +332,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       <div className="px-3 pb-4 shrink-0">
         <div className="flex items-center gap-3 px-3 py-3 rounded-2xl bg-slate-50 border border-slate-100">
           <Avatar className="h-8 w-8">
+            {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.firstName} />}
             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
           </Avatar>
           <div className="min-w-0">

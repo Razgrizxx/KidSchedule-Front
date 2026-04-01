@@ -3,6 +3,20 @@ import api from '@/api'
 import type { FamilySettings, UserSettings } from '@/types/api'
 import { useAuthStore } from '@/store/authStore'
 
+export function useUploadAvatar() {
+  const setAvatarUrl = useAuthStore((s) => s.setAvatarUrl)
+  return useMutation({
+    mutationFn: (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return api.post<{ avatarUrl: string }>('/users/me/avatar', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data)
+    },
+    onSuccess: ({ avatarUrl }) => setAvatarUrl(avatarUrl),
+  })
+}
+
 // ── Phone verification ────────────────────────────────────────────────────────
 
 export function useSendPhoneCode() {
@@ -19,9 +33,8 @@ export function useVerifyPhone() {
   return useMutation({
     mutationFn: ({ phone, code }: { phone: string; code: string }) =>
       api.post('/auth/phone/verify', { phone, code }).then((r) => r.data),
-    onSuccess: () => {
-      // Mark the stored user as verified without requiring a new login
-      if (user && token) setAuth({ ...user, isVerified: true }, token)
+    onSuccess: (_, { phone }) => {
+      if (user && token) setAuth({ ...user, isVerified: true, phone }, token)
     },
   })
 }

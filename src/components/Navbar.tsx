@@ -46,6 +46,7 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const accessMode = useAuthStore((s) => s.accessMode);
   const caregiverData = useAuthStore((s) => s.caregiverData);
+  const isLoggedIn = accessMode === 'parent';
   const navigate = useNavigate();
 
   const linkClass =
@@ -121,6 +122,10 @@ export function Navbar() {
                   ? `Back to ${caregiverData.children[0].firstName}'s Schedule`
                   : 'Back to Schedule'}
               </Button>
+            ) : isLoggedIn ? (
+              <Link to="/dashboard">
+                <Button size="sm">Dashboard</Button>
+              </Link>
             ) : (
               <>
                 <Link to="/login">
@@ -201,16 +206,24 @@ export function Navbar() {
             </Badge>
           </Link>
           <div className="flex flex-col gap-2 pt-3 border-t border-slate-100">
-            <Link to="/login" onClick={() => setIsOpen(false)}>
-              <Button variant="outline" size="sm" className="w-full">
-                Log In
-              </Button>
-            </Link>
-            <Link to="/login" onClick={() => setIsOpen(false)}>
-              <Button size="sm" className="w-full">
-                Get Started
-              </Button>
-            </Link>
+            {isLoggedIn ? (
+              <Link to="/dashboard" onClick={() => setIsOpen(false)}>
+                <Button size="sm" className="w-full">Dashboard</Button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" onClick={() => setIsOpen(false)}>
+                  <Button variant="outline" size="sm" className="w-full">
+                    Log In
+                  </Button>
+                </Link>
+                <Link to="/login" onClick={() => setIsOpen(false)}>
+                  <Button size="sm" className="w-full">
+                    Get Started
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -54,6 +54,34 @@ export function useAddChild(familyId: string) {
   })
 }
 
+export type UpdateChildDto = Partial<CreateChildDto>
+
+export function useUpdateChild(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...dto }: UpdateChildDto & { id: string }) =>
+      api.patch(`/families/${familyId}/children/${id}`, dto).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['children', familyId] })
+      void qc.invalidateQueries({ queryKey: ['family', familyId] })
+      void qc.invalidateQueries({ queryKey: ['families'] })
+    },
+  })
+}
+
+export function useDeleteChild(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (childId: string) =>
+      api.delete(`/families/${familyId}/children/${childId}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['children', familyId] })
+      void qc.invalidateQueries({ queryKey: ['family', familyId] })
+      void qc.invalidateQueries({ queryKey: ['families'] })
+    },
+  })
+}
+
 export function useInviteMember(familyId: string) {
   const qc = useQueryClient()
   return useMutation({
@@ -132,6 +160,28 @@ export function useRemoveCaregiver(familyId: string) {
   return useMutation({
     mutationFn: (id: string) =>
       api.delete(`/families/${familyId}/caregivers/${id}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['caregivers', familyId] })
+    },
+  })
+}
+
+export function useAssignCaregiverToChild(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ caregiverId, childId }: { caregiverId: string; childId: string }) =>
+      api.post(`/families/${familyId}/caregivers/${caregiverId}/assign/${childId}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['caregivers', familyId] })
+    },
+  })
+}
+
+export function useUnassignCaregiverFromChild(familyId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ caregiverId, childId }: { caregiverId: string; childId: string }) =>
+      api.delete(`/families/${familyId}/caregivers/${caregiverId}/assign/${childId}`).then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['caregivers', familyId] })
     },

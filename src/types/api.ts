@@ -158,6 +158,7 @@ export interface Caregiver {
   linkExpiresAt?: string
   createdAt: string
   updatedAt: string
+  children?: { child: Child }[]
 }
 
 export type EventType = 'CUSTODY_TIME' | 'SCHOOL' | 'MEDICAL' | 'ACTIVITY' | 'VACATION' | 'OTHER'
@@ -178,6 +179,8 @@ export interface CalendarEvent {
   notes?: string
   assignedToId?: string
   assignedTo?: { id: string; firstName: string; lastName: string }
+  caregiverId?: string
+  caregiver?: { id: string; name: string }
   children: { child: { id: string; firstName: string; lastName: string; color: string } }[]
   createdAt: string
 }
@@ -260,6 +263,16 @@ export type OrgRole = 'OWNER' | 'ADMIN' | 'VOLUNTEER' | 'MEMBER'
 export type OrgMemberStatus = 'PENDING' | 'ACTIVE'
 export type RsvpStatus = 'YES' | 'NO' | 'MAYBE'
 
+export interface OrgCustomRole {
+  id: string
+  organizationId: string
+  name: string
+  canCreateEvents: boolean
+  canCreateAnnouncements: boolean
+  canCreateVenues: boolean
+  _count?: { members: number }
+}
+
 export interface OrgMember {
   id: string
   userId: string
@@ -268,6 +281,7 @@ export interface OrgMember {
   status: OrgMemberStatus
   joinedAt: string
   approvedAt?: string
+  customRole?: OrgCustomRole | null
   user: {
     id: string
     firstName: string
@@ -318,8 +332,10 @@ export interface Organization {
   role: OrgRole
   myRole?: OrgRole
   myStatus?: OrgMemberStatus
+  myCustomRole?: OrgCustomRole | null
   members?: OrgMember[]
   venues?: Venue[]
+  customRoles?: OrgCustomRole[]
   createdAt: string
   updatedAt: string
   _count?: { members: number; events: number; announcements: number }

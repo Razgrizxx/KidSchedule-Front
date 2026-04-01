@@ -321,6 +321,31 @@ export interface Announcement {
   author: { id: string; firstName: string; lastName: string }
 }
 
+export interface OrgRosterEntry {
+  id: string
+  orgId: string
+  firstName: string
+  lastName: string
+  parentName?: string
+  parentEmail?: string
+  parentPhone?: string
+  notes?: string
+  linkedChildId?: string
+  linkedUserId?: string
+  inviteToken?: string
+  linkedChild?: {
+    id: string
+    firstName: string
+    lastName: string
+    color: string
+    family?: {
+      members: { user: { id: string; firstName: string; lastName: string; email: string } }[]
+    }
+  }
+  linkedUser?: { id: string; firstName: string; lastName: string; email: string }
+  createdAt: string
+}
+
 export interface Organization {
   id: string
   name: string

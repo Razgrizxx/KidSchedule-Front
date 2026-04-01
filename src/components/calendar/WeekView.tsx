@@ -174,9 +174,11 @@ export function WeekView({
                           <p className="text-[11px] font-semibold text-indigo-800 leading-tight truncate">
                             {ev.title}
                           </p>
-                          {!ev.allDay && (
+                          {(!ev.allDay || ev.caregiver) && (
                             <p className="text-[10px] text-indigo-400 leading-tight">
-                              {ev.startAt.slice(11, 16)}
+                              {!ev.allDay && ev.startAt.slice(11, 16)}
+                              {!ev.allDay && ev.caregiver && ' · '}
+                              {ev.caregiver && ev.caregiver.name}
                             </p>
                           )}
                         </div>

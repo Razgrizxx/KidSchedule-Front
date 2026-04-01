@@ -151,7 +151,10 @@ export function DayView({
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{EVENT_TYPE_LABELS[ev.type]}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {EVENT_TYPE_LABELS[ev.type]}
+                    {ev.caregiver && ` · ${ev.caregiver.name}`}
+                  </p>
                   {assignedChildren.length > 0 && (
                     <div className="flex items-center gap-1 mt-1.5 flex-wrap">
                       {assignedChildren.map((c) => (

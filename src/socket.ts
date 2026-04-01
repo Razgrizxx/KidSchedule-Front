@@ -10,6 +10,7 @@ export function getSocket(): Socket {
     const socketBase = apiUrl.replace(/\/api\/v\d+$/, '')
     socket = io(`${socketBase}/chat`, {
       auth: { token },
+      path: '/api/v1/socket.io',
       autoConnect: true,
       reconnection: true,
       reconnectionDelay: 1000,

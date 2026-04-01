@@ -176,6 +176,11 @@ export function ListView({
                             Private
                           </span>
                         )}
+                        {ev.caregiver && (
+                          <span className="text-[10px] text-purple-500 font-medium">
+                            · {ev.caregiver.name}
+                          </span>
+                        )}
                       </div>
                       {assignedChildren.length > 0 && (
                         <div className="flex items-center gap-1 mt-1.5 flex-wrap">

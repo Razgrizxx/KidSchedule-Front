@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api'
 
 export type PlanType = 'FREE' | 'ESSENTIAL' | 'PLUS' | 'COMPLETE'
@@ -55,6 +55,17 @@ export function useCreateCheckout() {
       api.post('/stripe/checkout', { priceId }).then((r) => r.data as { url: string }),
     onSuccess: ({ url }) => {
       window.location.href = url
+    },
+  })
+}
+
+export function useActivateFromSession() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (sessionId: string) =>
+      api.post(`/stripe/activate?session_id=${sessionId}`).then((r) => r.data as { activated: boolean }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['subscription'] })
     },
   })
 }

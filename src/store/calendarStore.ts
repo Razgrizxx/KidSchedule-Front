@@ -15,6 +15,7 @@ interface CalendarStore {
 
 function addMonths(date: Date, n: number): Date {
   const d = new Date(date)
+  d.setDate(1) // clamp to avoid day-overflow (e.g. Mar 31 + 1 month → May 1)
   d.setMonth(d.getMonth() + n)
   return d
 }

@@ -250,6 +250,7 @@ export function MonthView({
                 <p className="text-[10px] text-indigo-400">
                   {ev.allDay ? 'All day' : `${ev.startAt.slice(11, 16)} – ${ev.endAt.slice(11, 16)}`}
                   {ev.visibility === 'PRIVATE' && ' · Private'}
+                  {ev.caregiver && ` · ${ev.caregiver.name}`}
                 </p>
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">

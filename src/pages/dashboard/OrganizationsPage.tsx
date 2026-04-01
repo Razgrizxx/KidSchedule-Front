@@ -612,7 +612,7 @@ function AddRosterModal({ orgId, rosterLabel, open, onClose }: {
         parentEmail: group.parents[0].email,
         linkedChildId: group.child.id,
       })
-      toast({ title: `${entry.child.firstName} added`, variant: 'success' })
+      toast({ title: `${group.child.firstName} added`, variant: 'success' })
       reset(); onClose()
     } catch {
       toast({ title: 'Could not add', variant: 'error' })

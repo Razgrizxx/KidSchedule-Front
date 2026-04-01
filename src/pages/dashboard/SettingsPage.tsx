@@ -23,7 +23,7 @@ import {
   useVerifyPhone,
   useUploadAvatar,
 } from '@/hooks/useSettings'
-import { useSubscription, useCreatePortal, type PlanType } from '@/hooks/useSubscription'
+import { useSubscription, useCreatePortal, useActivateFromSession, type PlanType } from '@/hooks/useSubscription'
 import { Input } from '@/components/ui/input'
 import { getErrorMessage } from '@/lib/getErrorMessage'
 import { useQueryClient } from '@tanstack/react-query'
@@ -463,10 +463,12 @@ export function SettingsPage() {
   // URL param feedback (Google OAuth + Stripe checkout)
   const [searchParams, setSearchParams] = useSearchParams()
   const [justPurchased, setJustPurchased] = useState(false)
+  const activateFromSession = useActivateFromSession()
 
   useEffect(() => {
     const google = searchParams.get('google')
     const checkout = searchParams.get('checkout')
+    const sessionId = searchParams.get('session_id')
 
     if (google === 'connected') {
       toast({ title: 'Google Calendar connected!', variant: 'success' })
@@ -479,7 +481,11 @@ export function SettingsPage() {
     if (checkout === 'success') {
       setJustPurchased(true)
       toast({ title: 'Payment successful!', description: 'Your plan is being activated…', variant: 'success' })
-      setSearchParams((prev) => { prev.delete('checkout'); return prev })
+      setSearchParams((prev) => { prev.delete('checkout'); prev.delete('session_id'); return prev })
+      // Activate directly from session in case webhook hasn't fired yet
+      if (sessionId) {
+        activateFromSession.mutate(sessionId)
+      }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

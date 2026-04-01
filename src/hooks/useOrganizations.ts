@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api'
-import type { Organization, OrgCustomRole, OrgEvent, OrgType, OrgRole } from '@/types/api'
+import type { Organization, OrgCustomRole, OrgEvent, OrgRosterEntry, OrgType, OrgRole } from '@/types/api'
 
 export const orgKeys = {
   mine: ['organizations', 'mine'] as const,
@@ -12,6 +12,7 @@ export const orgKeys = {
   venues: (id: string) => ['organizations', id, 'venues'] as const,
   rsvps: (id: string, eventId: string) => ['organizations', id, 'events', eventId, 'rsvp'] as const,
   roles: (id: string) => ['organizations', id, 'roles'] as const,
+  roster: (id: string) => ['organizations', id, 'roster'] as const,
 }
 
 // ── Queries ────────────────────────────────────────────────────────────────
@@ -240,6 +241,16 @@ export function useCreateVenue() {
   })
 }
 
+export function useUpdateVenue() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, venueId, ...body }: {
+      orgId: string; venueId: string; name: string; address?: string; mapUrl?: string; notes?: string
+    }) => api.patch(`/organizations/${orgId}/venues/${venueId}`, body).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.venues(vars.orgId) }),
+  })
+}
+
 export function useDeleteVenue() {
   const qc = useQueryClient()
   return useMutation({
@@ -315,5 +326,58 @@ export function useAssignCustomRole() {
       orgId: string; userId: string; customRoleId: string | null
     }) => api.patch(`/organizations/${orgId}/members/${userId}/custom-role`, { customRoleId }).then((r) => r.data),
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.detail(vars.orgId) }),
+  })
+}
+
+// ── Members' children ─────────────────────────────────────────────────────
+
+export interface MemberChild {
+  parent: { id: string; firstName: string; lastName: string; email: string }
+  child: { id: string; firstName: string; lastName: string; color: string }
+}
+
+export function useOrgMembersChildren(orgId?: string) {
+  return useQuery<MemberChild[]>({
+    queryKey: ['organizations', orgId, 'members-children'],
+    queryFn: () => api.get(`/organizations/${orgId}/members-children`).then((r) => r.data),
+    enabled: !!orgId,
+  })
+}
+
+// ── Roster ─────────────────────────────────────────────────────────────────
+
+export function useOrgRoster(orgId?: string) {
+  return useQuery<OrgRosterEntry[]>({
+    queryKey: orgKeys.roster(orgId!),
+    queryFn: () => api.get(`/organizations/${orgId}/roster`).then((r) => r.data),
+    enabled: !!orgId,
+  })
+}
+
+export function useAddToRoster() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, ...body }: {
+      orgId: string; firstName: string; lastName: string
+      parentName?: string; parentEmail?: string; parentPhone?: string; notes?: string
+      linkedChildId?: string
+    }) => api.post(`/organizations/${orgId}/roster`, body).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.roster(vars.orgId) }),
+  })
+}
+
+export function useRemoveFromRoster() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orgId, rosterId }: { orgId: string; rosterId: string }) =>
+      api.delete(`/organizations/${orgId}/roster/${rosterId}`).then((r) => r.data),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: orgKeys.roster(vars.orgId) }),
+  })
+}
+
+export function useSendRosterInvite() {
+  return useMutation({
+    mutationFn: ({ orgId, rosterId }: { orgId: string; rosterId: string }) =>
+      api.post(`/organizations/${orgId}/roster/${rosterId}/invite`).then((r) => r.data),
   })
 }

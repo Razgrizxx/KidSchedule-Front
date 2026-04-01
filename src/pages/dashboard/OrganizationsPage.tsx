@@ -1,18 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   School, Trophy, Copy, Check, Trash2, UserMinus, CalendarPlus, Loader2,
   Crown, MapPin, Megaphone, Pin, UserCheck, UserX, Download, Globe,
-  Lock, Search, ChevronDown, Plus, CalendarDays, Link2, ShieldCheck,
+  Lock, Search, ChevronDown, Plus, CalendarDays, Link2, ShieldCheck, Users, Send, Mail, Pencil,
 } from 'lucide-react'
 import {
   useOrganization, useDeleteOrg, useLeaveOrg, useUpdateOrg,
   useCreateOrgEvent, useDeleteOrgEvent, useOrgEvents,
   useApproveMember, useRejectMember, useRemoveMember, useUpdateMemberRole,
-  useCreateVenue, useDeleteVenue, useOrgVenues,
+  useCreateVenue, useUpdateVenue, useDeleteVenue, useOrgVenues,
   useCreateAnnouncement, useDeleteAnnouncement, useOrgAnnouncements,
   useUpsertRsvp, useBulkCreateOrgEvents,
   useCreateCustomRole, useUpdateCustomRole, useDeleteCustomRole, useAssignCustomRole,
+  useOrgRoster, useAddToRoster, useRemoveFromRoster, useSendRosterInvite,
+  useOrgMembersChildren, type MemberChild,
 } from '@/hooks/useOrganizations'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/hooks/use-toast'
@@ -25,7 +27,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import type { OrgCustomRole, OrgEvent, OrgMember, OrgRole, Venue, Announcement } from '@/types/api'
+import type { OrgCustomRole, OrgEvent, OrgMember, OrgRole, OrgRosterEntry, Venue, Announcement } from '@/types/api'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -400,6 +402,73 @@ function AddVenueModal({ orgId, open, onClose }: { orgId: string; open: boolean;
   )
 }
 
+// ── Edit Venue Modal ───────────────────────────────────────────────────────
+
+function EditVenueModal({ orgId, venue, open, onClose }: {
+  orgId: string; venue: Venue | null; open: boolean; onClose: () => void
+}) {
+  const [name, setName] = useState('')
+  const [address, setAddress] = useState('')
+  const [mapUrl, setMapUrl] = useState('')
+  const [notes, setNotes] = useState('')
+  const updateVenue = useUpdateVenue()
+
+  useEffect(() => {
+    if (venue) {
+      setName(venue.name)
+      setAddress(venue.address ?? '')
+      setMapUrl(venue.mapUrl ?? '')
+      setNotes(venue.notes ?? '')
+    }
+  }, [venue])
+
+  async function handleSubmit() {
+    if (!venue || !name.trim()) return
+    try {
+      await updateVenue.mutateAsync({
+        orgId, venueId: venue.id,
+        name: name.trim(),
+        address: address.trim() || undefined,
+        mapUrl: mapUrl.trim() || undefined,
+        notes: notes.trim() || undefined,
+      })
+      toast({ title: 'Venue updated', variant: 'success' })
+      onClose()
+    } catch {
+      toast({ title: 'Could not update venue', variant: 'error' })
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Edit Venue</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Name *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Address</Label>
+            <Input placeholder="123 Main St" value={address} onChange={(e) => setAddress(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Map URL</Label>
+            <Input placeholder="https://maps.google.com/..." value={mapUrl} onChange={(e) => setMapUrl(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Notes</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="resize-none" rows={2} />
+          </div>
+          <Button className="w-full" onClick={handleSubmit} disabled={updateVenue.isPending || !name.trim()}>
+            {updateVenue.isPending ? 'Saving…' : 'Save changes'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Announcement Composer ──────────────────────────────────────────────────
 
 function AnnouncementComposer({ orgId, onClose }: { orgId: string; onClose: () => void }) {
@@ -441,6 +510,255 @@ function AnnouncementComposer({ orgId, onClose }: { orgId: string; onClose: () =
   )
 }
 
+// ── Roster Entry Row ───────────────────────────────────────────────────────
+
+function RosterEntryRow({ entry, isManager, onRemove, onSendInvite }: {
+  entry: OrgRosterEntry; isManager: boolean; onRemove: () => void; onSendInvite: () => void
+}) {
+  return (
+    <div className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors">
+      <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+        <span className="text-xs font-semibold text-teal-700">
+          {entry.firstName[0]}{entry.lastName[0]}
+        </span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-800">{entry.firstName} {entry.lastName}</p>
+        {entry.linkedChild?.family ? (
+          <p className="text-xs text-slate-400 truncate">
+            {entry.linkedChild.family.members
+              .map((m) => `${m.user.firstName} ${m.user.lastName}`)
+              .join(' · ')}
+          </p>
+        ) : entry.parentName ? (
+          <p className="text-xs text-slate-400 truncate">
+            {entry.parentName}{entry.parentEmail && ` · ${entry.parentEmail}`}
+          </p>
+        ) : null}
+        {entry.linkedChild && (
+          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 mt-0.5">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: entry.linkedChild.color }} />
+            Linked to app
+          </span>
+        )}
+      </div>
+      {isManager && (
+        <div className="flex items-center gap-1.5 shrink-0">
+          {entry.parentEmail && (
+            <button
+              type="button"
+              onClick={onSendInvite}
+              title="Send portal link"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onRemove}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Add Roster Modal ───────────────────────────────────────────────────────
+
+function AddRosterModal({ orgId, rosterLabel, open, onClose }: {
+  orgId: string; rosterLabel: string; open: boolean; onClose: () => void
+}) {
+  const [mode, setMode] = useState<'quick' | 'manual'>('quick')
+  const [selectedChildId, setSelectedChildId] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [parentName, setParentName] = useState('')
+  const [parentEmail, setParentEmail] = useState('')
+  const [parentPhone, setParentPhone] = useState('')
+  const [notes, setNotes] = useState('')
+  const addToRoster = useAddToRoster()
+  const { data: membersChildren = [] } = useOrgMembersChildren(open ? orgId : undefined)
+
+  // Group by child.id so each child appears once with all parents listed
+  const groupedChildren = membersChildren.reduce<{
+    child: MemberChild['child']
+    parents: MemberChild['parent'][]
+  }[]>((acc, mc) => {
+    const existing = acc.find((g) => g.child.id === mc.child.id)
+    if (existing) { existing.parents.push(mc.parent) }
+    else { acc.push({ child: mc.child, parents: [mc.parent] }) }
+    return acc
+  }, [])
+
+  function reset() {
+    setMode('quick'); setSelectedChildId('')
+    setFirstName(''); setLastName(''); setParentName('')
+    setParentEmail(''); setParentPhone(''); setNotes('')
+  }
+
+  async function handleQuickAdd() {
+    const group = groupedChildren.find((g) => g.child.id === selectedChildId)
+    if (!group) return
+    try {
+      await addToRoster.mutateAsync({
+        orgId,
+        firstName: group.child.firstName,
+        lastName: group.child.lastName,
+        parentName: group.parents.map((p) => `${p.firstName} ${p.lastName}`).join(', '),
+        parentEmail: group.parents[0].email,
+        linkedChildId: group.child.id,
+      })
+      toast({ title: `${entry.child.firstName} added`, variant: 'success' })
+      reset(); onClose()
+    } catch {
+      toast({ title: 'Could not add', variant: 'error' })
+    }
+  }
+
+  async function handleManualAdd() {
+    if (!firstName.trim() || !lastName.trim()) return
+    try {
+      await addToRoster.mutateAsync({
+        orgId,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        parentName: parentName.trim() || undefined,
+        parentEmail: parentEmail.trim() || undefined,
+        parentPhone: parentPhone.trim() || undefined,
+        notes: notes.trim() || undefined,
+      })
+      toast({ title: 'Child added', variant: 'success' })
+      reset(); onClose()
+    } catch {
+      toast({ title: 'Could not add', variant: 'error' })
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose() } }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Add to {rosterLabel}</DialogTitle></DialogHeader>
+
+        {/* Mode tabs */}
+        <div className="flex rounded-lg bg-slate-100 p-0.5 gap-0.5">
+          <button
+            type="button"
+            onClick={() => { setMode('quick'); setSelectedChildId('') }}
+            className={cn('flex-1 text-xs py-1.5 rounded-md font-medium transition-colors',
+              mode === 'quick' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+          >
+            From members
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('manual')}
+            className={cn('flex-1 text-xs py-1.5 rounded-md font-medium transition-colors',
+              mode === 'manual' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+          >
+            Manual entry
+          </button>
+        </div>
+
+        {mode === 'quick' ? (
+          <div key="quick" className="space-y-3">
+            {groupedChildren.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">
+                No children found from current members.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>Select a child</Label>
+                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                  {groupedChildren.map((g) => (
+                    <button
+                      key={g.child.id}
+                      type="button"
+                      onClick={() => setSelectedChildId(g.child.id)}
+                      className={cn(
+                        'w-full flex items-center gap-3 p-2.5 rounded-xl border text-left transition-colors',
+                        selectedChildId === g.child.id
+                          ? 'border-teal-400 bg-teal-50'
+                          : 'border-slate-100 hover:border-slate-200',
+                      )}
+                    >
+                      <span
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                        style={{ background: g.child.color }}
+                      >
+                        {g.child.firstName[0]}{g.child.lastName[0]}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-800">
+                          {g.child.firstName} {g.child.lastName}
+                        </p>
+                        <p className="text-xs text-slate-400 truncate">
+                          {g.parents.map((p) => `${p.firstName} ${p.lastName}`).join(' · ')}
+                        </p>
+                      </div>
+                      {selectedChildId === g.child.id && (
+                        <Check className="w-4 h-4 text-teal-500 shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <Button
+              className="w-full"
+              onClick={handleQuickAdd}
+              disabled={addToRoster.isPending || !selectedChildId}
+            >
+              {addToRoster.isPending ? 'Saving…' : 'Add'}
+            </Button>
+          </div>
+        ) : (
+          <div key="manual" className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>First name *</Label>
+                <Input placeholder="Emma" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Last name *</Label>
+                <Input placeholder="Smith" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Parent / guardian name</Label>
+              <Input placeholder="John Smith" value={parentName} onChange={(e) => setParentName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-slate-400" /> Parent email
+              </Label>
+              <Input type="email" placeholder="parent@email.com" value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Parent phone</Label>
+              <Input placeholder="+1 555 000 0000" value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Textarea placeholder="Allergies, notes…" value={notes} onChange={(e) => setNotes(e.target.value)} className="resize-none" rows={2} />
+            </div>
+            <Button
+              className="w-full"
+              onClick={handleManualAdd}
+              disabled={addToRoster.isPending || !firstName.trim() || !lastName.trim()}
+            >
+              {addToRoster.isPending ? 'Saving…' : 'Add'}
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export function OrganizationsPage() {
@@ -455,10 +773,14 @@ export function OrganizationsPage() {
   const [composingAnnouncement, setComposingAnnouncement] = useState(false)
   const [memberSearch, setMemberSearch] = useState('')
 
+  const [addRosterOpen, setAddRosterOpen] = useState(false)
+  const [editVenue, setEditVenue] = useState<Venue | null>(null)
+
   const { data: org, isLoading } = useOrganization(id)
   const { data: events = [] } = useOrgEvents(id)
   const { data: venues = [] } = useOrgVenues(id)
   const { data: announcements = [] } = useOrgAnnouncements(id)
+  const { data: roster = [] } = useOrgRoster(id)
   const deleteOrg = useDeleteOrg()
   const leaveOrg = useLeaveOrg()
   const updateOrg = useUpdateOrg()
@@ -467,6 +789,8 @@ export function OrganizationsPage() {
   const removeM = useRemoveMember()
   const deleteVenue = useDeleteVenue()
   const deleteAnn = useDeleteAnnouncement()
+  const removeFromRoster = useRemoveFromRoster()
+  const sendRosterInvite = useSendRosterInvite()
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-64">
@@ -675,6 +999,10 @@ export function OrganizationsPage() {
           <TabsTrigger value="announcements" className="flex-1">
             <Megaphone className="w-3.5 h-3.5 mr-1.5" /> Posts
           </TabsTrigger>
+          <TabsTrigger value="roster" className="flex-1">
+            <Users className="w-3.5 h-3.5 mr-1.5" />
+            {org.type === 'SCHOOL' ? 'Students' : 'Roster'}
+          </TabsTrigger>
           {isManager && (
             <TabsTrigger value="roles" className="flex-1">
               <ShieldCheck className="w-3.5 h-3.5 mr-1.5" /> Roles
@@ -774,12 +1102,22 @@ export function OrganizationsPage() {
                   )}
                 </div>
                 {isManager && (
-                  <button
-                    onClick={() => deleteVenue.mutate({ orgId: org.id, venueId: v.id })}
-                    className="p-1 text-slate-300 hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditVenue(v)}
+                      className="p-1 text-slate-300 hover:text-teal-500 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteVenue.mutate({ orgId: org.id, venueId: v.id })}
+                      className="p-1 text-slate-300 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
@@ -823,6 +1161,38 @@ export function OrganizationsPage() {
           </div>
         </TabsContent>
 
+        {/* ── Roster tab ── */}
+        <TabsContent value="roster" className="space-y-3 mt-4">
+          {isManager && (
+            <Button size="sm" onClick={() => setAddRosterOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              Add {org.type === 'SCHOOL' ? 'student' : 'child'}
+            </Button>
+          )}
+          {roster.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">
+              No {org.type === 'SCHOOL' ? 'students' : 'children'} yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {roster.map((entry) => (
+                <RosterEntryRow
+                  key={entry.id}
+                  entry={entry}
+                  isManager={isManager}
+                  onRemove={() => removeFromRoster.mutate({ orgId: org.id, rosterId: entry.id })}
+                  onSendInvite={() => {
+                    sendRosterInvite.mutate({ orgId: org.id, rosterId: entry.id }, {
+                      onSuccess: () => toast({ title: 'Invite sent', variant: 'success' }),
+                      onError: () => toast({ title: 'Could not send invite', variant: 'error' }),
+                    })
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
         {/* ── Roles tab ── */}
         {isManager && (
           <TabsContent value="roles" className="mt-4">
@@ -835,6 +1205,13 @@ export function OrganizationsPage() {
       <AddEventModal orgId={org.id} venues={venues as Venue[]} open={addEventOpen} onClose={() => setAddEventOpen(false)} />
       <BulkScheduleModal orgId={org.id} venues={venues as Venue[]} open={bulkOpen} onClose={() => setBulkOpen(false)} />
       <AddVenueModal orgId={org.id} open={addVenueOpen} onClose={() => setAddVenueOpen(false)} />
+      <EditVenueModal orgId={org.id} venue={editVenue} open={!!editVenue} onClose={() => setEditVenue(null)} />
+      <AddRosterModal
+        orgId={org.id}
+        rosterLabel={org.type === 'SCHOOL' ? 'Students' : 'Roster'}
+        open={addRosterOpen}
+        onClose={() => setAddRosterOpen(false)}
+      />
     </div>
   )
 }

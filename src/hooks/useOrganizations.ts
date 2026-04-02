@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/api'
-import type { Organization, OrgCustomRole, OrgEvent, OrgRosterEntry, OrgType, OrgRole } from '@/types/api'
+import type { Organization, OrgCustomRole, OrgEntity, OrgEvent, OrgRosterEntry, OrgType, OrgRole } from '@/types/api'
 
 export const orgKeys = {
+  entities: ['organizations', 'entities', 'mine'] as const,
   mine: ['organizations', 'mine'] as const,
   detail: (id: string) => ['organizations', id] as const,
   events: (id: string, month?: string) => ['organizations', id, 'events', month] as const,
@@ -13,6 +14,36 @@ export const orgKeys = {
   rsvps: (id: string, eventId: string) => ['organizations', id, 'events', eventId, 'rsvp'] as const,
   roles: (id: string) => ['organizations', id, 'roles'] as const,
   roster: (id: string) => ['organizations', id, 'roster'] as const,
+}
+
+// ── Entities ───────────────────────────────────────────────────────────────
+
+export function useMyEntities() {
+  return useQuery<OrgEntity[]>({
+    queryKey: orgKeys.entities,
+    queryFn: () => api.get('/organizations/entities/mine').then((r) => r.data),
+  })
+}
+
+export function useCreateEntity() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { name: string; type: OrgType; description?: string }) =>
+      api.post('/organizations/entities', body).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: orgKeys.entities }),
+  })
+}
+
+export function useDeleteEntity() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (entityId: string) =>
+      api.delete(`/organizations/entities/${entityId}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: orgKeys.entities })
+      void qc.invalidateQueries({ queryKey: orgKeys.mine })
+    },
+  })
 }
 
 // ── Queries ────────────────────────────────────────────────────────────────
@@ -88,7 +119,7 @@ export function useEventRsvps(orgId?: string, eventId?: string) {
 export function useCreateOrg() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: { name: string; type: OrgType; description?: string; isPublic?: boolean }) =>
+    mutationFn: (body: { name: string; type: OrgType; description?: string; isPublic?: boolean; entityId?: string }) =>
       api.post('/organizations', body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: orgKeys.mine }),
   })

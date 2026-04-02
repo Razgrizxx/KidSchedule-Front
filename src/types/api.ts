@@ -346,6 +346,16 @@ export interface OrgRosterEntry {
   createdAt: string
 }
 
+export interface OrgEntity {
+  id: string
+  name: string
+  type: OrgType
+  description?: string
+  createdById: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Organization {
   id: string
   name: string
@@ -354,6 +364,8 @@ export interface Organization {
   adminId: string
   isPublic: boolean
   description?: string
+  entityId?: string
+  entity?: Pick<OrgEntity, 'id' | 'name' | 'type'>
   role: OrgRole
   myRole?: OrgRole
   myStatus?: OrgMemberStatus

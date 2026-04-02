@@ -32,12 +32,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useMyOrganizations, useCreateOrg, useJoinOrg } from '@/hooks/useOrganizations'
+import {
+  useMyOrganizations, useCreateOrg, useJoinOrg,
+  useMyEntities, useCreateEntity,
+} from '@/hooks/useOrganizations'
 import { useSubscription, canUseFeature } from '@/hooks/useSubscription'
 import { ProBadge, UpgradeModal } from '@/components/FeatureGate'
 import { toast } from '@/hooks/use-toast'
 import { getErrorMessage } from '@/lib/getErrorMessage'
-import type { OrgType } from '@/types/api'
+import type { OrgEntity, OrgType, Organization } from '@/types/api'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
@@ -60,16 +63,23 @@ const ORG_COLORS: Record<OrgType, string> = {
 function OrgModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [tab, setTab] = useState<'join' | 'create'>('join')
   const [code, setCode] = useState('')
-  const [name, setName] = useState('')
   const [type, setType] = useState<OrgType>('SCHOOL')
+  // Entity step
+  const [entityStep, setEntityStep] = useState<'select' | 'new'>('select')
+  const [selectedEntityId, setSelectedEntityId] = useState('')
+  const [entityName, setEntityName] = useState('')
+  // Group step
+  const [groupName, setGroupName] = useState('')
 
   const joinOrg = useJoinOrg()
   const createOrg = useCreateOrg()
+  const createEntity = useCreateEntity()
+  const { data: entities = [] } = useMyEntities()
+  const filteredEntities = entities.filter((e) => e.type === type)
 
   function reset() {
-    setCode('')
-    setName('')
-    setType('SCHOOL')
+    setCode(''); setType('SCHOOL'); setEntityStep('select')
+    setSelectedEntityId(''); setEntityName(''); setGroupName('')
   }
 
   async function handleJoin() {
@@ -77,43 +87,44 @@ function OrgModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     try {
       await joinOrg.mutateAsync(code.trim())
       toast({ title: 'Joined!', description: 'You have joined the organization.' })
-      reset()
-      onClose()
+      reset(); onClose()
     } catch (err) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
   async function handleCreate() {
-    if (!name.trim()) return
+    if (!groupName.trim()) return
     try {
-      const org = await createOrg.mutateAsync({ name: name.trim(), type })
+      let entityId = selectedEntityId || undefined
+
+      // Create new entity if the user chose that path
+      if (entityStep === 'new' && entityName.trim()) {
+        const newEntity = await createEntity.mutateAsync({ name: entityName.trim(), type })
+        entityId = newEntity.id
+      }
+
+      const org = await createOrg.mutateAsync({ name: groupName.trim(), type, entityId })
       toast({ title: 'Created!', description: `Invite code: ${org.inviteCode}` })
-      reset()
-      onClose()
+      reset(); onClose()
     } catch (err) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'error' })
     }
   }
 
+  const isSaving = createOrg.isPending || createEntity.isPending
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose() } }}>
       <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Groups</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Groups</DialogTitle></DialogHeader>
 
-        {/* Tabs */}
+        {/* Join / Create tabs */}
         <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
           {(['join', 'create'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={cn(
-                'flex-1 py-1.5 rounded-lg text-sm font-medium transition-all',
-                tab === t ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500',
-              )}
-            >
+            <button key={t} type="button" onClick={() => setTab(t)}
+              className={cn('flex-1 py-1.5 rounded-lg text-sm font-medium transition-all',
+                tab === t ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500')}>
               {t === 'join' ? 'Join a Group' : 'New Group'}
             </button>
           ))}
@@ -124,12 +135,9 @@ function OrgModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             <p className="text-sm text-slate-500">Enter the invite code shared by the group admin.</p>
             <div className="space-y-1.5">
               <Label>Invite Code</Label>
-              <Input
-                placeholder="KID-XXXX"
-                value={code}
+              <Input placeholder="KID-XXXX" value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
-                onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-              />
+                onKeyDown={(e) => e.key === 'Enter' && handleJoin()} />
             </div>
             <Button className="w-full" onClick={handleJoin} disabled={joinOrg.isPending}>
               {joinOrg.isPending ? 'Joining…' : 'Join Group'}
@@ -137,41 +145,190 @@ function OrgModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Group Name</Label>
-              <Input
-                placeholder="Soccer Team U10"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+            {/* Type selector */}
             <div className="space-y-1.5">
               <Label>Type</Label>
               <div className="flex gap-2">
                 {(['SCHOOL', 'TEAM'] as OrgType[]).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setType(t)}
-                    className={cn(
-                      'flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-all',
-                      type === t
-                        ? 'border-teal-400 bg-teal-50 text-teal-700'
-                        : 'border-slate-200 text-slate-500 hover:border-slate-300',
-                    )}
-                  >
+                  <button key={t} type="button" onClick={() => { setType(t); setSelectedEntityId('') }}
+                    className={cn('flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-all',
+                      type === t ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-500 hover:border-slate-300')}>
                     {t === 'SCHOOL' ? <School className="w-4 h-4" /> : <Trophy className="w-4 h-4" />}
                     {t === 'SCHOOL' ? 'School' : 'Team'}
                   </button>
                 ))}
               </div>
             </div>
-            <Button className="w-full" onClick={handleCreate} disabled={createOrg.isPending}>
-              {createOrg.isPending ? 'Creating…' : 'Create Group'}
+
+            {/* Entity (parent) */}
+            <div className="space-y-1.5">
+              <Label>{type === 'SCHOOL' ? 'School' : 'Club'} <span className="text-slate-400 font-normal">(parent entity)</span></Label>
+              <div className="flex rounded-lg bg-slate-100 p-0.5 gap-0.5 mb-2">
+                <button type="button" onClick={() => setEntityStep('select')}
+                  className={cn('flex-1 text-xs py-1.5 rounded-md font-medium transition-colors',
+                    entityStep === 'select' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500')}>
+                  {filteredEntities.length > 0 ? 'Select existing' : 'No entities yet'}
+                </button>
+                <button type="button" onClick={() => setEntityStep('new')}
+                  className={cn('flex-1 text-xs py-1.5 rounded-md font-medium transition-colors',
+                    entityStep === 'new' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500')}>
+                  Create new
+                </button>
+              </div>
+
+              {entityStep === 'select' ? (
+                filteredEntities.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-2">No {type === 'SCHOOL' ? 'schools' : 'clubs'} yet — create one.</p>
+                ) : (
+                  <div className="space-y-1 max-h-36 overflow-y-auto">
+                    {/* No entity option */}
+                    <button type="button" onClick={() => setSelectedEntityId('')}
+                      className={cn('w-full text-left px-3 py-2 rounded-xl border text-sm transition-colors',
+                        selectedEntityId === '' ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-slate-100 text-slate-400 hover:border-slate-200')}>
+                      No entity
+                    </button>
+                    {filteredEntities.map((e) => (
+                      <button key={e.id} type="button" onClick={() => setSelectedEntityId(e.id)}
+                        className={cn('w-full text-left px-3 py-2 rounded-xl border text-sm font-medium transition-colors',
+                          selectedEntityId === e.id ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-slate-100 text-slate-800 hover:border-slate-200')}>
+                        {e.name}
+                      </button>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <Input placeholder={type === 'SCHOOL' ? 'Colegio San Martín' : 'Club River Plate'}
+                  value={entityName} onChange={(e) => setEntityName(e.target.value)} />
+              )}
+            </div>
+
+            {/* Group name */}
+            <div className="space-y-1.5">
+              <Label>Group name</Label>
+              <Input placeholder={type === 'SCHOOL' ? '4to grado B' : 'Equipo 15 años'}
+                value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+            </div>
+
+            <Button className="w-full" onClick={handleCreate}
+              disabled={isSaving || !groupName.trim() || (entityStep === 'new' && !entityName.trim())}>
+              {isSaving ? 'Creating…' : 'Create Group'}
             </Button>
           </div>
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ── Org grouped list ──────────────────────────────────────────────────────
+
+function OrgNavLink({ org, onClose }: { org: Organization; onClose: () => void }) {
+  return (
+    <NavLink
+      key={org.id}
+      to={`/dashboard/organizations/${org.id}`}
+      onClick={onClose}
+      className={({ isActive }) =>
+        cn(
+          'flex items-center gap-2 pl-5 pr-3 py-1.5 rounded-xl text-sm transition-all',
+          isActive
+            ? 'bg-teal-50 text-teal-700 font-medium'
+            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800',
+        )
+      }
+    >
+      <span className="truncate flex-1 text-[13px]">{org.name}</span>
+      <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
+    </NavLink>
+  )
+}
+
+function OrgSection({
+  type,
+  orgs,
+  onClose,
+}: {
+  type: OrgType
+  orgs: Organization[]
+  onClose: () => void
+}) {
+  if (orgs.length === 0) return null
+
+  // Group by entity
+  const withEntity: Record<string, { entityName: string; orgs: Organization[] }> = {}
+  const noEntity: Organization[] = []
+
+  for (const org of orgs) {
+    if (org.entity) {
+      if (!withEntity[org.entity.id]) {
+        withEntity[org.entity.id] = { entityName: org.entity.name, orgs: [] }
+      }
+      withEntity[org.entity.id].orgs.push(org)
+    } else {
+      noEntity.push(org)
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-center gap-1.5 px-3 pb-0.5">
+        <span className={cn('w-4 h-4 rounded flex items-center justify-center', ORG_COLORS[type])}>
+          {type === 'SCHOOL' ? <School className="w-2.5 h-2.5" /> : <Trophy className="w-2.5 h-2.5" />}
+        </span>
+        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+          {type === 'SCHOOL' ? 'Schools' : 'Teams'}
+        </span>
+      </div>
+
+      {/* Orgs grouped under an entity */}
+      {Object.values(withEntity).map(({ entityName, orgs: entityOrgs }) => (
+        <div key={entityName} className="mt-1">
+          <div className="px-3 py-0.5">
+            <span className="text-[11px] font-medium text-slate-500 truncate block">{entityName}</span>
+          </div>
+          <div className="space-y-0.5">
+            {entityOrgs.map((org) => (
+              <OrgNavLink key={org.id} org={org} onClose={onClose} />
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* Orgs without an entity */}
+      {noEntity.length > 0 && (
+        <div className="space-y-0.5 mt-1">
+          {noEntity.map((org) => (
+            <NavLink
+              key={org.id}
+              to={`/dashboard/organizations/${org.id}`}
+              onClick={onClose}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm transition-all',
+                  isActive
+                    ? 'bg-teal-50 text-teal-700 font-medium'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800',
+                )
+              }
+            >
+              <span className="truncate flex-1 text-[13px]">{org.name}</span>
+              <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OrgList({ orgs, onClose }: { orgs: Organization[]; onClose: () => void }) {
+  const teams = orgs.filter((o) => o.type === 'TEAM')
+  const schools = orgs.filter((o) => o.type === 'SCHOOL')
+  return (
+    <div className="space-y-0.5">
+      <OrgSection type="SCHOOL" orgs={schools} onClose={onClose} />
+      <OrgSection type="TEAM" orgs={teams} onClose={onClose} />
+    </div>
   )
 }
 
@@ -272,29 +429,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
               Join or create a group
             </button>
           ) : (
-            <div className="space-y-0.5">
-              {orgs.map((org) => (
-                <NavLink
-                  key={org.id}
-                  to={`/dashboard/organizations/${org.id}`}
-                  onClick={onClose}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all',
-                      isActive
-                        ? 'bg-teal-50 text-teal-700 font-medium'
-                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800',
-                    )
-                  }
-                >
-                  <span className={cn('w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0', ORG_COLORS[org.type])}>
-                    {org.type === 'SCHOOL' ? <School className="w-3 h-3" /> : <Trophy className="w-3 h-3" />}
-                  </span>
-                  <span className="truncate flex-1 text-sm">{org.name}</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-                </NavLink>
-              ))}
-            </div>
+            <OrgList orgs={orgs} onClose={onClose} />
           )}
         </div>
       </nav>
